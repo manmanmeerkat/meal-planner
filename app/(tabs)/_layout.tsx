@@ -1,4 +1,3 @@
-// app/(tabs)/_layout.tsx
 import { Tabs } from "expo-router";
 import { HapticTab } from "../../components/ui/HapticTab";
 
@@ -7,6 +6,9 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: "#007AFF",
+        tabBarLabelStyle: {
+          fontSize: 12,
+        },
       }}
     >
       <Tabs.Screen
@@ -17,21 +19,23 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="recipes/index" // パスを修正
+        name="recipes"
         options={{
           title: "レシピ",
           tabBarIcon: ({ color }) => (
             <HapticTab icon="book-open" color={color} />
           ),
+          headerShown: false,
         }}
       />
       <Tabs.Screen
-        name="plans/index" // パスを修正
+        name="plans"
         options={{
           title: "献立",
           tabBarIcon: ({ color }) => (
             <HapticTab icon="calendar" color={color} />
           ),
+          headerShown: false,
         }}
       />
     </Tabs>

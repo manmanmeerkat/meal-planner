@@ -1,33 +1,14 @@
 // hooks/useRecipes.ts
 import { useState, useEffect } from 'react';
 import { supabase } from '../constants/supabase';
-
-interface Recipe {
-  id: string;
-  title: string;
-  description: string;
-  image_url: string;
-  ingredients: Array<{ name: string; amount: string }>;
-  steps: string[];
-}
-
-interface SupabaseError {
-  message: string;
-}
-
-interface NewRecipe {
-  title: string;
-  description: string;
-  image_url: string;
-  ingredients: Array<{ name: string; amount: string }>;
-  steps: string[];
-}
+import { Recipe } from '../types/recipe';
 
 export function useRecipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // レシピ一覧取得
   const fetchRecipes = async () => {
     try {
       setLoading(true);
@@ -41,13 +22,40 @@ export function useRecipes() {
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
+      } else {
+        setError('An unknown error occurred');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const addRecipe = async (recipe: NewRecipe) => {
+  // 単一レシピ取得
+  const getRecipe = async (id: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // レシピ作成
+  const createRecipe = async (recipe: Omit<Recipe, 'id'>) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -56,11 +64,13 @@ export function useRecipes() {
         .select();
 
       if (error) throw error;
-      setRecipes([...recipes, data[0]]);
+      setRecipes(prev => [...prev, data[0]]);
       return data[0];
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
+      } else {
+        setError('An unknown error occurred');
       }
       return null;
     } finally {
@@ -68,14 +78,54 @@ export function useRecipes() {
     }
   };
 
-  const getRecipe = async (id: string) => {
+  // レシピ更新
+  const updateRecipe = async (id: string, updates: Partial<Omit<Recipe, 'id'>>) => {
     try {
-      const response = await fetch(`/api/recipes/${id}`);
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error(error);
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('recipes')
+        .update(updates)
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+      setRecipes(prev => prev.map(recipe => 
+        recipe.id === id ? data[0] : recipe
+      ));
+      return data[0];
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
       return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // レシピ削除
+  const deleteRecipe = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setRecipes(prev => prev.filter(recipe => recipe.id !== id));
+      return true;
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,7 +134,9 @@ export function useRecipes() {
     loading,
     error,
     fetchRecipes,
-    addRecipe,
     getRecipe,
+    createRecipe,
+    updateRecipe,
+    deleteRecipe,
   };
 }
