@@ -1,7 +1,7 @@
 // app/(tabs)/plans/index.tsx
 import { StyleSheet } from "react-native";
 import { ThemedView } from "../../../components/ui/ThemedView";
-import { WeeklyMealPlan } from "../../../components/meal-plan/DayPlan"; // パスを確認してください
+import { WeeklyMealPlan } from "../../../components/meal-plan/DayPlan";
 
 export default function PlanIndex() {
   return (

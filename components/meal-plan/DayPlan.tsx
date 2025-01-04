@@ -5,23 +5,40 @@ import { ja } from "date-fns/locale";
 import { router } from "expo-router";
 import { ThemedView } from "../ui/ThemedView";
 import { ThemedText } from "../ui/ThemedText";
-import { CollapsibleView } from "../ui/CollapsibleView";
 import { RecipeCard } from "../recipe/RecipeCard";
 import { Recipe } from "../../types/recipe";
 import { MealType } from "../../types/mealPlans";
 import { useMealPlans } from "../../hooks/useMealPlan";
 import { useState, useEffect } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { RefreshControl } from "react-native";
+
+const COLORS = {
+  primary: "#FF6B6B",
+  secondary: "#4ECDC4",
+  accent: "#FFE66D",
+  background: "#F7F9FC",
+  card: "#FFFFFF",
+  text: {
+    primary: "#2D3748",
+    secondary: "#718096",
+    accent: "#FF6B6B",
+  },
+  mealTypes: {
+    breakfast: "#FFB347",
+    lunch: "#4ECDC4",
+    dinner: "#A78BFA",
+  },
+};
 
 interface DailyMeals {
-  [key: string]: {
-    recipe: Recipe;
-  };
+  [key: string]: Array<{ recipe: Recipe }>;
 }
 
 interface DayPlanProps {
   date: Date;
   meals: DailyMeals;
-  onUpdate: () => void;
+  onUpdate?: () => void;
 }
 
 const getMealTypeLabel = (type: MealType) => {
@@ -37,7 +54,7 @@ export function WeeklyMealPlan() {
   const [weeklyMeals, setWeeklyMeals] = useState<Record<string, DailyMeals>>(
     {}
   );
-  const { fetchMealPlans, loading } = useMealPlans();
+  const { fetchMealPlans, loading, mealPlans } = useMealPlans();
 
   const today = new Date();
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -46,11 +63,7 @@ export function WeeklyMealPlan() {
     return date;
   });
 
-  const loadMeals = async () => {
-    const startDate = weekDays[0];
-    const endDate = weekDays[weekDays.length - 1];
-    const mealPlans = await fetchMealPlans(startDate, endDate);
-
+  useEffect(() => {
     if (mealPlans) {
       const groupedMeals: Record<string, DailyMeals> = {};
       mealPlans.forEach((plan) => {
@@ -58,12 +71,21 @@ export function WeeklyMealPlan() {
         if (!groupedMeals[dateKey]) {
           groupedMeals[dateKey] = {};
         }
-        groupedMeals[dateKey][plan.meal_type] = {
+        if (!groupedMeals[dateKey][plan.meal_type]) {
+          groupedMeals[dateKey][plan.meal_type] = [];
+        }
+        groupedMeals[dateKey][plan.meal_type].push({
           recipe: plan.recipe!,
-        };
+        });
       });
       setWeeklyMeals(groupedMeals);
     }
+  }, [mealPlans]);
+
+  const loadMeals = async () => {
+    const startDate = weekDays[0];
+    const endDate = weekDays[weekDays.length - 1];
+    await fetchMealPlans(startDate, endDate);
   };
 
   useEffect(() => {
@@ -71,7 +93,16 @@ export function WeeklyMealPlan() {
   }, []);
 
   return (
-    <ScrollView style={styles.scrollView}>
+    <ScrollView
+      style={styles.scrollView}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={loadMeals}
+          colors={[COLORS.primary]}
+        />
+      }
+    >
       {weekDays.map((date) => (
         <View key={date.toISOString()} style={styles.dayContainer}>
           <DayPlan
@@ -85,16 +116,15 @@ export function WeeklyMealPlan() {
   );
 }
 
-function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
+export function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
   const mealTypes: MealType[] = ["breakfast", "lunch", "dinner"];
 
   const handlePress = (type: MealType) => {
     router.push({
-      pathname: "/(tabs)/plans" as const,
+      pathname: "/plans/create",
       params: {
-        date: date.toISOString(),
+        date: format(date, "yyyy-MM-dd"),
         mealType: type,
-        action: "create",
       },
     });
   };
@@ -105,29 +135,50 @@ function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
         {format(date, "M月d日(E)", { locale: ja })}
       </ThemedText>
       {mealTypes.map((type) => (
-        <Pressable
-          key={type}
-          onPress={() => handlePress(type)}
-          style={({ pressed }) => [
-            styles.mealSection,
-            pressed && styles.pressed,
-          ]}
-        >
-          <View>
+        <View key={type} style={styles.mealSection}>
+          <View
+            style={[
+              styles.mealHeader,
+              { backgroundColor: COLORS.mealTypes[type] },
+            ]}
+          >
             <ThemedText style={styles.mealType}>
               {getMealTypeLabel(type)}
             </ThemedText>
-            {meals[type] ? (
-              <RecipeCard recipe={meals[type].recipe} compact />
+            <Pressable
+              onPress={() => handlePress(type)}
+              style={({ pressed }) => [
+                styles.addButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons name="add-circle" size={24} color="white" />
+            </Pressable>
+          </View>
+          <View style={styles.mealContent}>
+            {meals[type]?.length > 0 ? (
+              <View style={styles.recipeList}>
+                {meals[type].map((meal, index) => (
+                  <View key={index} style={styles.recipeItem}>
+                    <RecipeCard recipe={meal.recipe} compact />
+                  </View>
+                ))}
+              </View>
             ) : (
-              <View style={styles.emptyContainer}>
+              <Pressable
+                onPress={() => handlePress(type)}
+                style={({ pressed }) => [
+                  styles.emptyContainer,
+                  pressed && styles.pressed,
+                ]}
+              >
                 <ThemedText style={styles.emptyText}>
                   タップしてメニューを設定
                 </ThemedText>
-              </View>
+              </Pressable>
             )}
           </View>
-        </Pressable>
+        </View>
       ))}
     </ThemedView>
   );
@@ -136,12 +187,12 @@ function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
 const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: COLORS.background,
   },
   dayContainer: {
     margin: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -149,36 +200,56 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   container: {
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
   },
   date: {
     fontSize: 18,
     fontWeight: "600",
     padding: 16,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: COLORS.card,
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
+    color: COLORS.text.primary,
   },
   mealSection: {
+    backgroundColor: COLORS.card,
+    marginBottom: 1,
+  },
+  mealHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
   },
   mealType: {
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
+    color: "white",
+  },
+  mealContent: {
+    padding: 16,
+  },
+  addButton: {
+    padding: 4,
+  },
+  recipeList: {
+    gap: 12,
+  },
+  recipeItem: {
     marginBottom: 8,
-    color: "#4A5568",
   },
   emptyContainer: {
-    padding: 16,
-    backgroundColor: "#F7FAFC",
-    borderRadius: 8,
+    padding: 24,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#E2E8F0",
     alignItems: "center",
   },
   emptyText: {
-    color: "#718096",
+    color: COLORS.text.secondary,
     fontSize: 14,
   },
   pressed: {
