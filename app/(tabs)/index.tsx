@@ -10,7 +10,7 @@ import { useRecipes } from "../../hooks/useRecipes";
 import { useMealPlans } from "../../hooks/useMealPlan";
 import { MealType } from "../../types/mealPlans";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Recipe } from "../../types/recipe";
 
 const COLORS = {
@@ -35,6 +35,13 @@ export default function HomeScreen() {
   const { recipes } = useRecipes();
   const { mealPlans, loading, fetchMealPlans, deleteMealPlan } = useMealPlans();
   const { refresh } = useLocalSearchParams();
+  const [collapsedSections, setCollapsedSections] = useState<
+    Record<MealType, boolean>
+  >({
+    breakfast: false,
+    lunch: false,
+    dinner: false,
+  });
 
   const mealTypes: { type: MealType; label: string; icon: any }[] = [
     { type: "breakfast", label: "朝食", icon: "sunny-outline" },
@@ -57,6 +64,13 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
+  const toggleSection = (type: MealType) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [type]: !prev[type],
+    }));
+  };
+
   // 今日の献立を抽出（mealPlanIdを含める）
   const todaysMeals = mealPlans?.reduce((acc, meal) => {
     if (meal.date === format(new Date(), "yyyy-MM-dd")) {
@@ -78,7 +92,7 @@ export default function HomeScreen() {
       params: {
         date: today,
         mealType: type,
-        from: "home", // fromパラメータを追加
+        from: "home",
       },
     });
   };
@@ -96,7 +110,7 @@ export default function HomeScreen() {
           try {
             const success = await deleteMealPlan(mealPlanId);
             if (success) {
-              await loadData(); // データを再読み込み
+              await loadData();
             } else {
               Alert.alert("エラー", "削除に失敗しました。");
             }
@@ -122,60 +136,77 @@ export default function HomeScreen() {
         <View style={styles.mealsSection}>
           {mealTypes.map(({ type, label, icon }) => (
             <View key={type} style={styles.mealCard}>
-              <View
+              <Pressable
+                onPress={() => toggleSection(type)}
                 style={[
                   styles.mealHeader,
                   { backgroundColor: COLORS.mealTypes[type] },
                 ]}
               >
-                <Ionicons name={icon} size={24} color="white" />
-                <ThemedText style={styles.mealLabel}>{label}</ThemedText>
-                <Pressable
-                  onPress={() => handlePressEmptyMeal(type)}
-                  style={({ pressed }) => [
-                    styles.addButton,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Ionicons name="add-circle" size={24} color="white" />
-                </Pressable>
-              </View>
-
-              <View style={styles.mealContent}>
-                {todaysMeals?.[type]?.length > 0 ? (
-                  <View style={styles.recipeList}>
-                    {todaysMeals[type].map((meal, index) => (
-                      <View key={index} style={styles.recipeItem}>
-                        <RecipeCard
-                          recipe={meal.recipe}
-                          compact
-                          mealPlanId={meal.id}
-                          onDelete={() => handleDelete(meal.id)}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                ) : (
+                <View style={styles.headerLeft}>
+                  <Ionicons name={icon} size={24} color="white" />
+                  <ThemedText style={styles.mealLabel}>{label}</ThemedText>
+                </View>
+                <View style={styles.headerRight}>
                   <Pressable
-                    onPress={() => handlePressEmptyMeal(type)}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handlePressEmptyMeal(type);
+                    }}
                     style={({ pressed }) => [
-                      styles.emptyMeal,
+                      styles.addButton,
                       pressed && styles.pressed,
                     ]}
                   >
-                    <View style={styles.emptyContent}>
-                      <Ionicons
-                        name="add-circle-outline"
-                        size={24}
-                        color="#718096"
-                      />
-                      <ThemedText style={styles.emptyText}>
-                        タップしてメニューを設定
-                      </ThemedText>
-                    </View>
+                    <Ionicons name="add-circle" size={24} color="white" />
                   </Pressable>
-                )}
-              </View>
+                  <Ionicons
+                    name={
+                      collapsedSections[type] ? "chevron-down" : "chevron-up"
+                    }
+                    size={24}
+                    color="white"
+                  />
+                </View>
+              </Pressable>
+
+              {!collapsedSections[type] && (
+                <View style={styles.mealContent}>
+                  {todaysMeals?.[type]?.length > 0 ? (
+                    <View style={styles.recipeList}>
+                      {todaysMeals[type].map((meal, index) => (
+                        <View key={index} style={styles.recipeItem}>
+                          <RecipeCard
+                            recipe={meal.recipe}
+                            compact
+                            mealPlanId={meal.id}
+                            onDelete={() => handleDelete(meal.id)}
+                          />
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Pressable
+                      onPress={() => handlePressEmptyMeal(type)}
+                      style={({ pressed }) => [
+                        styles.emptyMeal,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <View style={styles.emptyContent}>
+                        <Ionicons
+                          name="add-circle-outline"
+                          size={24}
+                          color="#718096"
+                        />
+                        <ThemedText style={styles.emptyText}>
+                          タップしてメニューを設定
+                        </ThemedText>
+                      </View>
+                    </Pressable>
+                  )}
+                </View>
+              )}
             </View>
           ))}
         </View>
@@ -190,7 +221,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   welcomeSection: {
-    backgroundColor: "#FF6B6B", // より温かみのある赤系の色に変更
+    backgroundColor: COLORS.primary,
     paddingTop: 20,
   },
   welcomeText: {
@@ -200,7 +231,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     padding: 16,
     paddingBottom: 4,
-    textAlign: "center", // 中央揃えに変更
+    textAlign: "center",
   },
   dateText: {
     fontSize: 16,
@@ -208,7 +239,7 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 0,
     paddingBottom: 20,
-    textAlign: "center", // 中央揃えに変更
+    textAlign: "center",
   },
   mealsSection: {
     padding: 16,
@@ -233,11 +264,20 @@ const styles = StyleSheet.create({
     padding: 16,
     justifyContent: "space-between",
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   mealLabel: {
     fontSize: 18,
     fontWeight: "600",
     color: "white",
-    flex: 1,
     marginLeft: 8,
   },
   addButton: {
@@ -268,46 +308,6 @@ const styles = StyleSheet.create({
     color: "#718096",
     fontSize: 14,
     marginTop: 8,
-  },
-  recipesSection: {
-    padding: 16,
-    backgroundColor: COLORS.card,
-    marginTop: 8,
-    marginBottom: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: COLORS.text.primary,
-  },
-  seeAllButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  seeAll: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  recipeCard: {
-    marginBottom: 16,
   },
   pressed: {
     opacity: 0.7,

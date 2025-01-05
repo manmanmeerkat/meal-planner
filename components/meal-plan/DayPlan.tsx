@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { ThemedView } from "../ui/ThemedView";
 import { ThemedText } from "../ui/ThemedText";
 import { RecipeCard } from "../recipe/RecipeCard";
@@ -17,6 +17,7 @@ import { Recipe } from "../../types/recipe";
 import { MealType } from "../../types/mealPlans";
 import { useMealPlans } from "../../hooks/useMealPlan";
 import { useState, useEffect } from "react";
+import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 const COLORS = {
@@ -48,6 +49,12 @@ interface DayPlanProps {
   date: Date;
   meals: DailyMeals;
   onUpdate?: () => void;
+  collapsedMeals: Record<MealType, boolean>;
+  setCollapsedMeals: (
+    value:
+      | Record<MealType, boolean>
+      | ((prev: Record<MealType, boolean>) => Record<MealType, boolean>)
+  ) => void;
 }
 
 const getMealTypeLabel = (type: MealType) => {
@@ -63,8 +70,13 @@ export function WeeklyMealPlan() {
   const [weeklyMeals, setWeeklyMeals] = useState<Record<string, DailyMeals>>(
     {}
   );
-  const { fetchMealPlans, loading, mealPlans } = useMealPlans();
+  const { fetchMealPlans, loading } = useMealPlans();
   const { refresh } = useLocalSearchParams();
+
+  // 日付とmealTypeの組み合わせで折りたたみ状態を管理
+  const [collapsedStates, setCollapsedStates] = useState<
+    Record<string, Record<MealType, boolean>>
+  >({});
 
   const today = new Date();
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -72,6 +84,20 @@ export function WeeklyMealPlan() {
     date.setDate(today.getDate() + i);
     return date;
   });
+
+  // 初期状態の設定
+  useEffect(() => {
+    const initialStates = weekDays.reduce((acc, date) => {
+      const dateKey = format(date, "yyyy-MM-dd");
+      acc[dateKey] = {
+        breakfast: false,
+        lunch: false,
+        dinner: false,
+      };
+      return acc;
+    }, {} as Record<string, Record<MealType, boolean>>);
+    setCollapsedStates(initialStates);
+  }, []);
 
   const loadMeals = async () => {
     const startDate = weekDays[0];
@@ -101,10 +127,6 @@ export function WeeklyMealPlan() {
     loadMeals();
   }, [refresh]);
 
-  useEffect(() => {
-    loadMeals();
-  }, []);
-
   return (
     <ScrollView
       style={styles.scrollView}
@@ -116,31 +138,60 @@ export function WeeklyMealPlan() {
         />
       }
     >
-      {weekDays.map((date) => (
-        <View key={date.toISOString()} style={styles.dayContainer}>
-          <DayPlan
-            date={date}
-            meals={weeklyMeals[format(date, "yyyy-MM-dd")] || {}}
-            onUpdate={loadMeals}
-          />
-        </View>
-      ))}
+      {weekDays.map((date) => {
+        const dateKey = format(date, "yyyy-MM-dd");
+        return (
+          <View key={date.toISOString()} style={styles.dayContainer}>
+            <ThemedText style={styles.date}>
+              {format(date, "M月d日(E)", { locale: ja })}
+            </ThemedText>
+            <DayPlan
+              date={date}
+              meals={weeklyMeals[dateKey] || {}}
+              onUpdate={loadMeals}
+              collapsedMeals={collapsedStates[dateKey] || {}}
+              setCollapsedMeals={(newState) => {
+                setCollapsedStates((prev) => ({
+                  ...prev,
+                  [dateKey]:
+                    typeof newState === "function"
+                      ? newState(prev[dateKey])
+                      : newState,
+                }));
+              }}
+            />
+          </View>
+        );
+      })}
       <View style={styles.bottomPadding} />
     </ScrollView>
   );
 }
 
-function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
+function DayPlan({
+  date,
+  meals,
+  onUpdate,
+  collapsedMeals,
+  setCollapsedMeals,
+}: DayPlanProps) {
   const { deleteMealPlan } = useMealPlans();
   const mealTypes: MealType[] = ["breakfast", "lunch", "dinner"];
 
+  const toggleMeal = (type: MealType) => {
+    setCollapsedMeals((prev) => ({
+      ...prev,
+      [type]: !prev[type],
+    }));
+  };
+
   const handlePress = (type: MealType) => {
     router.push({
-      pathname: "/(tabs)/plans/create",
+      pathname: "/plans/create",
       params: {
         date: format(date, "yyyy-MM-dd"),
         mealType: type,
-        from: "calendar", // fromパラメータを追加
+        from: "calendar",
       },
     });
   };
@@ -155,9 +206,16 @@ function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
         text: "削除",
         style: "destructive",
         onPress: async () => {
-          const success = await deleteMealPlan(mealPlanId);
-          if (success && onUpdate) {
-            onUpdate();
+          try {
+            const success = await deleteMealPlan(mealPlanId);
+            if (success && onUpdate) {
+              onUpdate();
+            } else if (!success) {
+              Alert.alert("エラー", "削除に失敗しました。");
+            }
+          } catch (error) {
+            console.error("Failed to delete meal plan:", error);
+            Alert.alert("エラー", "削除中にエラーが発生しました。");
           }
         },
       },
@@ -165,73 +223,86 @@ function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText style={styles.date}>
-        {format(date, "M月d日(E)", { locale: ja })}
-      </ThemedText>
+    <View style={styles.container}>
       {mealTypes.map((type) => (
         <View key={type} style={styles.mealSection}>
-          <View
+          <Pressable
+            onPress={() => toggleMeal(type)}
             style={[
               styles.mealHeader,
               { backgroundColor: COLORS.mealTypes[type] },
             ]}
           >
-            <Ionicons
-              name={
-                type === "breakfast"
-                  ? "sunny-outline"
-                  : type === "lunch"
-                  ? "restaurant-outline"
-                  : "moon-outline"
-              }
-              size={24}
-              color="white"
-            />
-            <ThemedText style={styles.mealType}>
-              {getMealTypeLabel(type)}
-            </ThemedText>
-            <Pressable
-              onPress={() => handlePress(type)}
-              style={({ pressed }) => [
-                styles.addButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Ionicons name="add-circle" size={24} color="white" />
-            </Pressable>
-          </View>
-          <View style={styles.mealContent}>
-            {meals[type]?.length > 0 ? (
-              <View style={styles.recipeList}>
-                {meals[type].map((meal, index) => (
-                  <View key={index} style={styles.recipeItem}>
-                    <RecipeCard
-                      recipe={meal.recipe}
-                      compact
-                      mealPlanId={meal.id}
-                      onDelete={() => handleDelete(meal.id)}
-                    />
-                  </View>
-                ))}
-              </View>
-            ) : (
+            <View style={styles.headerLeft}>
+              <Ionicons
+                name={
+                  type === "breakfast"
+                    ? "sunny-outline"
+                    : type === "lunch"
+                    ? "restaurant-outline"
+                    : "moon-outline"
+                }
+                size={24}
+                color="white"
+              />
+              <ThemedText style={styles.mealType}>
+                {getMealTypeLabel(type)}
+              </ThemedText>
+            </View>
+            <View style={styles.headerRight}>
               <Pressable
-                onPress={() => handlePress(type)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handlePress(type);
+                }}
                 style={({ pressed }) => [
-                  styles.emptyContainer,
+                  styles.addButton,
                   pressed && styles.pressed,
                 ]}
               >
-                <ThemedText style={styles.emptyText}>
-                  タップしてメニューを設定
-                </ThemedText>
+                <Ionicons name="add-circle" size={24} color="white" />
               </Pressable>
-            )}
-          </View>
+              <Ionicons
+                name={collapsedMeals[type] ? "chevron-down" : "chevron-up"}
+                size={24}
+                color="white"
+              />
+            </View>
+          </Pressable>
+
+          {!collapsedMeals[type] && (
+            <View style={styles.mealContent}>
+              {meals[type]?.length > 0 ? (
+                <View style={styles.recipeList}>
+                  {meals[type].map((meal, index) => (
+                    <View key={index} style={styles.recipeItem}>
+                      <RecipeCard
+                        recipe={meal.recipe}
+                        compact
+                        mealPlanId={meal.id}
+                        onDelete={() => handleDelete(meal.id)}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => handlePress(type)}
+                  style={({ pressed }) => [
+                    styles.emptyContainer,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ThemedText style={styles.emptyText}>
+                    タップしてメニューを設定
+                  </ThemedText>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
       ))}
-    </ThemedView>
+    </View>
   );
 }
 
@@ -257,11 +328,11 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 18,
     fontWeight: "600",
+    color: COLORS.text.primary,
     padding: 16,
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
-    color: COLORS.text.primary,
   },
   mealSection: {
     backgroundColor: COLORS.card,
@@ -273,11 +344,20 @@ const styles = StyleSheet.create({
     padding: 16,
     justifyContent: "space-between",
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   mealType: {
     fontSize: 16,
     fontWeight: "600",
     color: "white",
-    flex: 1,
     marginLeft: 8,
   },
   mealContent: {
