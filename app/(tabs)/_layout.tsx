@@ -25,6 +25,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "ホーム",
+          headerShown: false, // ここを追加
           tabBarIcon: ({ color }) => <HapticTab icon="home" color={color} />,
           tabBarButton: (props) => (
             <Pressable {...props} onPress={() => handleTabPress("index")} />

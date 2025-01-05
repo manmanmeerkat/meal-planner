@@ -2,13 +2,11 @@
 import {
   View,
   ScrollView,
-  TextInput,
   StyleSheet,
   Pressable,
   Switch,
   Alert,
 } from "react-native";
-import { ThemedView } from "../ui/ThemedView";
 import { ThemedText } from "../ui/ThemedText";
 import { Button } from "../ui/Button";
 import { useState } from "react";
@@ -160,13 +158,24 @@ export function RecipeForm({
     return Object.keys(newErrors).length === 0;
   };
 
+  const DEFAULT_IMAGES = [
+    "https://via.placeholder.com/400x300/F5F7FA/718096?text=Recipe",
+    "https://via.placeholder.com/400x300/F5F7FA/718096?text=Food",
+    "https://via.placeholder.com/400x300/F5F7FA/718096?text=Cooking",
+  ];
+
+  // ランダムに1つ選択する場合
+  const DEFAULT_IMAGE_URL =
+    DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)];
   const handleSubmit = () => {
     if (!validate()) return;
 
     const recipeData = {
       title,
       category,
-      image_url: initialData?.image_url ?? "",
+      image_url: isSimpleMode
+        ? DEFAULT_IMAGE_URL
+        : initialData?.image_url ?? "",
       calories: initialData?.calories ?? 0,
       ...(isSimpleMode
         ? {

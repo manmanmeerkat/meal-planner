@@ -179,35 +179,6 @@ export default function HomeScreen() {
             </View>
           ))}
         </View>
-
-        <View style={styles.recipesSection}>
-          <View style={styles.sectionHeader}>
-            <ThemedText style={styles.sectionTitle}>
-              最近追加したレシピ
-            </ThemedText>
-            <Pressable
-              onPress={() => router.push("/recipes")}
-              style={({ pressed }) => [
-                styles.seeAllButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText style={styles.seeAll}>すべて見る</ThemedText>
-            </Pressable>
-          </View>
-          {recipes?.slice(0, 3).map((recipe) => (
-            <Pressable
-              key={recipe.id}
-              style={({ pressed }) => [
-                styles.recipeCard,
-                pressed && styles.pressed,
-              ]}
-              onPress={() => router.push(`/recipes/${recipe.id}`)}
-            >
-              <RecipeCard recipe={recipe} />
-            </Pressable>
-          ))}
-        </View>
       </ScrollView>
     </ThemedView>
   );
@@ -219,19 +190,25 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   welcomeSection: {
-    padding: 20,
-    paddingTop: 24,
-    backgroundColor: COLORS.card,
+    backgroundColor: "#FF6B6B", // より温かみのある赤系の色に変更
+    paddingTop: 20,
   },
   welcomeText: {
     fontSize: 28,
     fontWeight: "bold",
-    color: COLORS.text.primary,
-    marginBottom: 4,
+    color: "white",
+    letterSpacing: 0.5,
+    padding: 16,
+    paddingBottom: 4,
+    textAlign: "center", // 中央揃えに変更
   },
   dateText: {
     fontSize: 16,
-    color: COLORS.text.secondary,
+    color: "rgba(255, 255, 255, 0.9)",
+    padding: 16,
+    paddingTop: 0,
+    paddingBottom: 20,
+    textAlign: "center", // 中央揃えに変更
   },
   mealsSection: {
     padding: 16,
@@ -296,6 +273,16 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: COLORS.card,
     marginTop: 8,
+    marginBottom: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -310,18 +297,22 @@ const styles = StyleSheet.create({
   },
   seeAllButton: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
   },
   seeAll: {
     color: "white",
     fontSize: 14,
+    fontWeight: "500",
   },
   recipeCard: {
     marginBottom: 16,
   },
   pressed: {
     opacity: 0.7,
+  },
+  scrollContent: {
+    paddingBottom: 16,
   },
 });

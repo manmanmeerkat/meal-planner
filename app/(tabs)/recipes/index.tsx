@@ -8,7 +8,7 @@ import {
   TextInput,
 } from "react-native";
 import { useState, useEffect } from "react";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { ThemedView } from "../../../components/ui/ThemedView";
 import { ThemedText } from "../../../components/ui/ThemedText";
 import { RecipeCard } from "../../../components/recipe/RecipeCard";
@@ -36,13 +36,13 @@ export default function RecipeList() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTime, setSelectedTime] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+  const { refresh } = useLocalSearchParams<{ refresh: string }>();
 
   useEffect(() => {
     fetchRecipes();
-  }, []);
+  }, [refresh]);
 
   const filteredRecipes = recipes.filter((recipe) => {
-    // 検索クエリでフィルタリング
     const matchesQuery =
       recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       recipe.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -50,11 +50,9 @@ export default function RecipeList() {
         ing.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
-    // カテゴリーでフィルタリング
     const matchesCategory =
       selectedCategory === "all" || recipe.category === selectedCategory;
 
-    // 調理時間でフィルタリング
     let matchesTime = true;
     if (selectedTime !== "all") {
       const time = parseInt(selectedTime);
@@ -71,34 +69,36 @@ export default function RecipeList() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <ThemedText style={styles.title}>マイレシピ</ThemedText>
-        <View style={styles.headerButtons}>
-          <Pressable
-            onPress={() => setShowFilters(!showFilters)}
-            style={({ pressed }) => [
-              styles.iconButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons
-              name="filter"
-              size={24}
-              color={showFilters ? COLORS.primary : "#4A5568"}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => setIsCompact(!isCompact)}
-            style={({ pressed }) => [
-              styles.iconButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons
-              name={isCompact ? "list" : "grid"}
-              size={24}
-              color="#4A5568"
-            />
-          </Pressable>
+        <View style={styles.headerContent}>
+          <ThemedText style={styles.title}>マイレシピ</ThemedText>
+          <View style={styles.headerButtons}>
+            <Pressable
+              onPress={() => setShowFilters(!showFilters)}
+              style={({ pressed }) => [
+                styles.iconButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons
+                name="filter"
+                size={24}
+                color={showFilters ? "white" : "rgba(255, 255, 255, 0.8)"}
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => setIsCompact(!isCompact)}
+              style={({ pressed }) => [
+                styles.iconButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons
+                name={isCompact ? "list" : "grid"}
+                size={24}
+                color="rgba(255, 255, 255, 0.8)"
+              />
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -111,6 +111,7 @@ export default function RecipeList() {
             placeholder="レシピ・材料を検索"
             style={styles.searchInput}
             clearButtonMode="while-editing"
+            placeholderTextColor={COLORS.text.secondary}
           />
         </View>
       </View>
@@ -231,18 +232,21 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
+    backgroundColor: COLORS.secondary,
+    paddingTop: 20,
+  },
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
-    backgroundColor: COLORS.card,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    paddingBottom: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
-    color: COLORS.text.primary,
+    color: "white",
+    letterSpacing: 0.5,
   },
   headerButtons: {
     flexDirection: "row",
@@ -250,8 +254,8 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     padding: 8,
-    borderRadius: 8,
-    backgroundColor: "#F7FAFC",
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
   },
   searchContainer: {
     padding: 16,
@@ -263,9 +267,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.background,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   searchInput: {
     flex: 1,

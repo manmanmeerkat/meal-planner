@@ -11,7 +11,10 @@ export default function CreateRecipe() {
   const handleSubmit = async (data: any) => {
     const result = await createRecipe(data);
     if (result) {
-      router.back();
+      router.push({
+        pathname: "/(tabs)/recipes",
+        params: { refresh: Date.now() },
+      });
     }
   };
 

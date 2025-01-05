@@ -7,6 +7,7 @@ export default function RecipesLayout() {
         name="index"
         options={{
           title: "レシピ一覧",
+          headerShown: false, // ここを追加
         }}
       />
       <Stack.Screen
