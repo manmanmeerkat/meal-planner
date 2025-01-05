@@ -1,13 +1,26 @@
-import { View, ScrollView, StyleSheet } from "react-native";
+// components/recipe/RecipeForm.tsx
+import {
+  View,
+  ScrollView,
+  TextInput,
+  StyleSheet,
+  Pressable,
+  Switch,
+  Alert,
+} from "react-native";
+import { ThemedView } from "../ui/ThemedView";
 import { ThemedText } from "../ui/ThemedText";
 import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
 import { useState } from "react";
 import { Recipe } from "../../types/recipe";
+import { CATEGORIES } from "../../constants/recipeFilters";
+import { Input } from "../ui/Input";
+import { Ionicons } from "@expo/vector-icons";
 
 interface RecipeFormProps {
   onSubmit: (data: Omit<Recipe, "id">) => void;
   initialData?: Partial<Omit<Recipe, "id">>;
+  loading?: boolean;
 }
 
 interface Ingredient {
@@ -15,7 +28,25 @@ interface Ingredient {
   amount: string;
 }
 
-export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
+const COLORS = {
+  primary: "#FF6B6B",
+  secondary: "#4ECDC4",
+  accent: "#FFE66D",
+  background: "#F7F9FC",
+  card: "#FFFFFF",
+  text: {
+    primary: "#2D3748",
+    secondary: "#718096",
+    accent: "#FF6B6B",
+  },
+};
+
+export function RecipeForm({
+  onSubmit,
+  initialData,
+  loading,
+}: RecipeFormProps) {
+  const [isSimpleMode, setIsSimpleMode] = useState(false);
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(
     initialData?.description ?? ""
@@ -26,20 +57,48 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
   const [servings, setServings] = useState(
     initialData?.servings?.toString() ?? ""
   );
+  const [category, setCategory] = useState(initialData?.category ?? "main");
   const [ingredients, setIngredients] = useState<Ingredient[]>(
     initialData?.ingredients ?? [{ name: "", amount: "" }]
   );
   const [steps, setSteps] = useState<string[]>(initialData?.steps ?? [""]);
-  const [calories, setCalories] = useState(
-    initialData?.calories?.toString() ?? ""
-  );
 
-  // バリデーションの状態
   const [errors, setErrors] = useState<{
     title?: string;
     cookingTime?: string;
     servings?: string;
   }>({});
+
+  const hasDetailedInfo = () => {
+    return !!(
+      description ||
+      cookingTime ||
+      servings ||
+      ingredients.some((i) => i.name || i.amount) ||
+      steps.some((s) => s)
+    );
+  };
+
+  const handleModeChange = (newMode: boolean) => {
+    if (newMode && !isSimpleMode && hasDetailedInfo()) {
+      Alert.alert(
+        "確認",
+        "簡易モードに切り替えると、詳細情報の編集ができなくなりますが、既存の情報は保持されます。",
+        [
+          {
+            text: "キャンセル",
+            style: "cancel",
+          },
+          {
+            text: "切り替える",
+            onPress: () => setIsSimpleMode(newMode),
+          },
+        ]
+      );
+    } else {
+      setIsSimpleMode(newMode);
+    }
+  };
 
   const addIngredient = () => {
     setIngredients([...ingredients, { name: "", amount: "" }]);
@@ -60,8 +119,7 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
 
   const removeIngredient = (index: number) => {
     if (ingredients.length > 1) {
-      const newIngredients = ingredients.filter((_, i) => i !== index);
-      setIngredients(newIngredients);
+      setIngredients(ingredients.filter((_, i) => i !== index));
     }
   };
 
@@ -77,8 +135,7 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
 
   const removeStep = (index: number) => {
     if (steps.length > 1) {
-      const newSteps = steps.filter((_, i) => i !== index);
-      setSteps(newSteps);
+      setSteps(steps.filter((_, i) => i !== index));
     }
   };
 
@@ -89,12 +146,14 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
       newErrors.title = "レシピ名を入力してください";
     }
 
-    if (cookingTime && isNaN(Number(cookingTime))) {
-      newErrors.cookingTime = "数値を入力してください";
-    }
+    if (!isSimpleMode) {
+      if (cookingTime && isNaN(Number(cookingTime))) {
+        newErrors.cookingTime = "数値を入力してください";
+      }
 
-    if (servings && isNaN(Number(servings))) {
-      newErrors.servings = "数値を入力してください";
+      if (servings && isNaN(Number(servings))) {
+        newErrors.servings = "数値を入力してください";
+      }
     }
 
     setErrors(newErrors);
@@ -104,188 +163,317 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
   const handleSubmit = () => {
     if (!validate()) return;
 
-    onSubmit({
+    const recipeData = {
       title,
-      description,
-      cooking_time: parseInt(cookingTime) || 0,
-      servings: parseInt(servings) || 0,
-      image_url: "https://via.placeholder.com/300",
-      ingredients: ingredients.filter((i) => i.name && i.amount),
-      steps: steps.filter((s) => s),
-      calories: parseInt(calories) || 0,
-    });
+      category,
+      image_url: initialData?.image_url ?? "",
+      calories: initialData?.calories ?? 0,
+      ...(isSimpleMode
+        ? {
+            description: initialData?.description ?? "",
+            cooking_time: initialData?.cooking_time ?? 0,
+            servings: initialData?.servings ?? 0,
+            ingredients: initialData?.ingredients ?? [],
+            steps: initialData?.steps ?? [],
+          }
+        : {
+            description,
+            cooking_time: parseInt(cookingTime) || 0,
+            servings: parseInt(servings) || 0,
+            ingredients: ingredients.filter((i) => i.name && i.amount),
+            steps: steps.filter((s) => s),
+          }),
+    };
+
+    onSubmit(recipeData);
   };
+
+  const styles = StyleSheet.create({
+    scroll: {
+      flex: 1,
+      backgroundColor: COLORS.background,
+    },
+    container: {
+      padding: 16,
+    },
+    modeSwitch: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 16,
+      backgroundColor: COLORS.card,
+      borderRadius: 12,
+      marginBottom: 16,
+    },
+    modeSwitchText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: COLORS.text.primary,
+    },
+    section: {
+      backgroundColor: COLORS.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      marginBottom: 16,
+      color: COLORS.text.primary,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: "500",
+      marginBottom: 8,
+      color: COLORS.text.secondary,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+    },
+    spacer: {
+      width: 12,
+    },
+    flex1: {
+      flex: 1,
+    },
+    flex2: {
+      flex: 2,
+    },
+    categorySection: {
+      marginTop: 16,
+    },
+    categoryList: {
+      flexGrow: 0,
+    },
+    categoryChip: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: COLORS.background,
+      marginRight: 8,
+      borderWidth: 1,
+      borderColor: "#E2E8F0",
+    },
+    categoryChipSelected: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    categoryChipText: {
+      fontSize: 14,
+      color: COLORS.text.primary,
+    },
+    categoryChipTextSelected: {
+      color: "white",
+    },
+    ingredientRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      marginBottom: 12,
+    },
+    stepContainer: {
+      marginBottom: 16,
+    },
+    stepHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    stepNumber: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: COLORS.text.primary,
+    },
+    addButton: {
+      marginTop: 8,
+    },
+    removeButton: {
+      marginLeft: 8,
+    },
+    submitButton: {
+      marginTop: 8,
+      marginBottom: 32,
+    },
+    pressed: {
+      opacity: 0.7,
+    },
+  });
 
   return (
     <ScrollView style={styles.scroll}>
       <View style={styles.container}>
-        {/* 基本情報セクション */}
-        <View style={styles.mainSection}>
-          <View style={styles.sectionTitleContainer}>
-            <ThemedText style={styles.mainSectionTitle}>基本情報</ThemedText>
-          </View>
+        <View style={styles.modeSwitch}>
+          <ThemedText style={styles.modeSwitchText}>簡易作成モード</ThemedText>
+          <Switch
+            value={isSimpleMode}
+            onValueChange={handleModeChange}
+            trackColor={{ false: "#E2E8F0", true: COLORS.primary }}
+            thumbColor={COLORS.card}
+          />
+        </View>
 
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.inputLabel}>レシピ名</ThemedText>
-            <Input
-              value={title}
-              onChangeText={setTitle}
-              error={errors.title}
-              placeholder="例：肉じゃが"
-              style={styles.marginBottom}
-            />
-          </View>
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>基本情報</ThemedText>
+          <Input
+            label="レシピ名"
+            value={title}
+            onChangeText={setTitle}
+            error={errors.title}
+            placeholder="例：肉じゃが"
+          />
 
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.inputLabel}>レシピの説明</ThemedText>
-            <Input
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              placeholder="レシピの説明や特徴を入力してください"
-              style={styles.marginBottom}
-              numberOfLines={4}
-            />
+          <View style={styles.categorySection}>
+            <ThemedText style={styles.label}>カテゴリー</ThemedText>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.categoryList}
+            >
+              {CATEGORIES.filter((c) => c.id !== "all").map((cat) => (
+                <Pressable
+                  key={cat.id}
+                  onPress={() => setCategory(cat.id)}
+                  style={({ pressed }) => [
+                    styles.categoryChip,
+                    category === cat.id && styles.categoryChipSelected,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ThemedText
+                    style={[
+                      styles.categoryChipText,
+                      category === cat.id && styles.categoryChipTextSelected,
+                    ]}
+                  >
+                    {cat.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
+        </View>
 
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.inputLabel}>所要時間と分量</ThemedText>
-            <View style={styles.row}>
-              <View style={[styles.flex1, styles.marginRight]}>
+        {!isSimpleMode && (
+          <>
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>詳細情報</ThemedText>
+              <Input
+                label="説明"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                placeholder="レシピの説明や特徴を入力してください"
+              />
+
+              <View style={styles.row}>
                 <Input
+                  label="調理時間"
                   value={cookingTime}
                   onChangeText={setCookingTime}
                   keyboardType="numeric"
                   error={errors.cookingTime}
                   placeholder="分"
                   suffix="分"
+                  style={styles.flex1}
                 />
-              </View>
-              <View style={styles.flex1}>
+                <View style={styles.spacer} />
                 <Input
+                  label="何人分"
                   value={servings}
                   onChangeText={setServings}
                   keyboardType="numeric"
                   error={errors.servings}
                   placeholder="人数"
                   suffix="人分"
+                  style={styles.flex1}
                 />
               </View>
             </View>
-          </View>
 
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.inputLabel}>カロリー</ThemedText>
-            <Input
-              value={calories}
-              onChangeText={setCalories}
-              keyboardType="numeric"
-              placeholder="kcal"
-              suffix="kcal"
-            />
-          </View>
-        </View>
-
-        {/* 材料セクション */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
+            <View style={styles.section}>
               <ThemedText style={styles.sectionTitle}>材料</ThemedText>
-              <View style={styles.badge}>
-                <ThemedText style={styles.badgeText}>
-                  {ingredients.length}
-                </ThemedText>
-              </View>
-            </View>
-          </View>
-
-          {ingredients.map((ingredient, index) => (
-            <View key={index} style={styles.ingredientRow}>
-              <View style={[styles.flex2, styles.marginRight]}>
-                <Input
-                  value={ingredient.name}
-                  onChangeText={(value) =>
-                    updateIngredient(index, "name", value)
-                  }
-                  placeholder="例：玉ねぎ"
-                />
-              </View>
-              <View style={styles.flex1}>
-                <Input
-                  value={ingredient.amount}
-                  onChangeText={(value) =>
-                    updateIngredient(index, "amount", value)
-                  }
-                  placeholder="例：1個"
-                />
-              </View>
-              {ingredients.length > 1 && (
-                <Button
-                  icon="trash"
-                  onPress={() => removeIngredient(index)}
-                  style={styles.removeButton}
-                  variant="ghost"
-                />
-              )}
-            </View>
-          ))}
-          <Button
-            title="材料を追加"
-            icon="add"
-            onPress={addIngredient}
-            style={styles.addButton}
-            variant="outline"
-          />
-        </View>
-
-        {/* 手順セクション */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <ThemedText style={styles.sectionTitle}>手順</ThemedText>
-              <View style={styles.badge}>
-                <ThemedText style={styles.badgeText}>{steps.length}</ThemedText>
-              </View>
-            </View>
-          </View>
-
-          {steps.map((step, index) => (
-            <View key={index} style={styles.stepContainer}>
-              <View style={styles.stepHeader}>
-                <ThemedText style={styles.stepNumber}>
-                  Step {index + 1}
-                </ThemedText>
-                {steps.length > 1 && (
-                  <Button
-                    icon="trash"
-                    onPress={() => removeStep(index)}
-                    variant="ghost"
-                    style={styles.removeButton}
+              {ingredients.map((ingredient, index) => (
+                <View key={index} style={styles.ingredientRow}>
+                  <Input
+                    label={`材料 ${index + 1}`}
+                    value={ingredient.name}
+                    onChangeText={(value) =>
+                      updateIngredient(index, "name", value)
+                    }
+                    placeholder="例：玉ねぎ"
+                    style={[styles.flex2]}
                   />
-                )}
-              </View>
-              <Input
-                value={step}
-                onChangeText={(value) => updateStep(index, value)}
-                multiline
-                placeholder="手順を入力してください"
-                style={styles.stepInput}
-                numberOfLines={3}
+                  <View style={styles.spacer} />
+                  <Input
+                    label="分量"
+                    value={ingredient.amount}
+                    onChangeText={(value) =>
+                      updateIngredient(index, "amount", value)
+                    }
+                    placeholder="例：1個"
+                    style={[styles.flex1]}
+                  />
+                  {ingredients.length > 1 && (
+                    <Button
+                      icon="trash"
+                      onPress={() => removeIngredient(index)}
+                      style={styles.removeButton}
+                      variant="ghost"
+                    />
+                  )}
+                </View>
+              ))}
+              <Button
+                title="材料を追加"
+                icon="add"
+                onPress={addIngredient}
+                style={styles.addButton}
+                variant="outline"
               />
             </View>
-          ))}
-          <Button
-            title="手順を追加"
-            icon="add"
-            onPress={addStep}
-            style={styles.addButton}
-            variant="outline"
-          />
-        </View>
+
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>手順</ThemedText>
+              {steps.map((step, index) => (
+                <View key={index} style={styles.stepContainer}>
+                  <View style={styles.stepHeader}>
+                    <ThemedText style={styles.stepNumber}>
+                      Step {index + 1}
+                    </ThemedText>
+                    {steps.length > 1 && (
+                      <Button
+                        icon="trash"
+                        onPress={() => removeStep(index)}
+                        variant="ghost"
+                        style={styles.removeButton}
+                      />
+                    )}
+                  </View>
+                  <Input
+                    value={step}
+                    onChangeText={(value) => updateStep(index, value)}
+                    multiline
+                    placeholder="手順を入力してください"
+                  />
+                </View>
+              ))}
+              <Button
+                title="手順を追加"
+                icon="add"
+                onPress={addStep}
+                style={styles.addButton}
+                variant="outline"
+              />
+            </View>
+          </>
+        )}
 
         <Button
-          title="レシピを保存"
+          title={loading ? "保存中..." : "レシピを保存"}
           onPress={handleSubmit}
+          disabled={loading}
           style={styles.submitButton}
           variant="primary"
         />
@@ -293,131 +481,3 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: "#F5F7FA",
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  mainSection: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  mainSectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1A1A1A",
-    marginBottom: 20,
-  },
-  inputGroup: {
-    marginBottom: 24,
-  },
-  inputLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#4A5568",
-    marginBottom: 8,
-  },
-  section: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionHeader: {
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    paddingBottom: 12,
-  },
-  sectionTitleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#2D3748",
-  },
-  badge: {
-    backgroundColor: "#EBF4FF",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginLeft: 8,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#4299E1",
-  },
-  marginBottom: {
-    marginBottom: 16,
-  },
-  marginRight: {
-    marginRight: 12,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  flex1: {
-    flex: 1,
-  },
-  flex2: {
-    flex: 2,
-  },
-  ingredientRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  stepContainer: {
-    marginBottom: 16,
-  },
-  stepHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  stepNumber: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4A5568",
-  },
-  stepInput: {
-    marginBottom: 8,
-  },
-  addButton: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderStyle: "dashed",
-  },
-  removeButton: {
-    marginLeft: 8,
-  },
-  submitButton: {
-    marginVertical: 24,
-    backgroundColor: "#4299E1",
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-});

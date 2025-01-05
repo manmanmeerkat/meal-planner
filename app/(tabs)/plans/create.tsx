@@ -47,9 +47,13 @@ export default function CreatePlan() {
       recipe_id: recipeId,
     });
 
-    if (result) {
-      router.back();
-    }
+    // 遷移元のパラメータに基づいて戻り先を決定
+    const destination = params.from === "home" ? "/(tabs)" : "/(tabs)/plans";
+
+    router.push({
+      pathname: destination,
+      params: { refresh: Date.now() },
+    });
   };
 
   const getMealTypeColor = (mealType: string) => {

@@ -2,11 +2,14 @@
 import { StyleSheet } from "react-native";
 import { ThemedView } from "../../../components/ui/ThemedView";
 import { WeeklyMealPlan } from "../../../components/meal-plan/DayPlan";
+import { useLocalSearchParams } from "expo-router";
 
 export default function PlanIndex() {
+  const { refresh } = useLocalSearchParams<{ refresh: string }>();
+
   return (
     <ThemedView style={styles.container}>
-      <WeeklyMealPlan />
+      <WeeklyMealPlan key={refresh} />
     </ThemedView>
   );
 }

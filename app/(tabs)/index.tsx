@@ -1,6 +1,6 @@
 // app/(tabs)/index.tsx
-import { View, StyleSheet, ScrollView, Pressable } from "react-native";
-import { router } from "expo-router";
+import { View, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { ThemedView } from "../../components/ui/ThemedView";
@@ -10,56 +10,66 @@ import { useRecipes } from "../../hooks/useRecipes";
 import { useMealPlans } from "../../hooks/useMealPlan";
 import { MealType } from "../../types/mealPlans";
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect } from "react";
 import { Recipe } from "../../types/recipe";
 
-// 新しいカラーパレット
 const COLORS = {
-  primary: "#FF6B6B", // ポップな赤
-  secondary: "#4ECDC4", // ミントグリーン
-  accent: "#FFE66D", // 明るい黄色
-  background: "#F7F9FC", // 明るい背景色
-  card: "#FFFFFF", // 白
+  primary: "#FF6B6B",
+  secondary: "#4ECDC4",
+  accent: "#FFE66D",
+  background: "#F7F9FC",
+  card: "#FFFFFF",
   text: {
-    primary: "#2D3748", // 濃い色のテキスト
-    secondary: "#718096", // 薄い色のテキスト
-    accent: "#FF6B6B", // アクセントテキスト
+    primary: "#2D3748",
+    secondary: "#718096",
+    accent: "#FF6B6B",
+  },
+  mealTypes: {
+    breakfast: "#FFB347",
+    lunch: "#4ECDC4",
+    dinner: "#A78BFA",
   },
 };
 
 export default function HomeScreen() {
   const { recipes } = useRecipes();
-  const { mealPlans, loading } = useMealPlans();
+  const { mealPlans, loading, fetchMealPlans, deleteMealPlan } = useMealPlans();
+  const { refresh } = useLocalSearchParams();
 
-  const mealTypes: {
-    type: MealType;
-    label: string;
-    icon: any;
-    color: string;
-  }[] = [
-    {
-      type: "breakfast",
-      label: "朝食",
-      icon: "sunny-outline",
-      color: "#FFB347",
-    }, // オレンジ
-    {
-      type: "lunch",
-      label: "昼食",
-      icon: "restaurant-outline",
-      color: "#4ECDC4",
-    }, // ミント
-    { type: "dinner", label: "夕食", icon: "moon-outline", color: "#A78BFA" }, // パープル
+  const mealTypes: { type: MealType; label: string; icon: any }[] = [
+    { type: "breakfast", label: "朝食", icon: "sunny-outline" },
+    { type: "lunch", label: "昼食", icon: "restaurant-outline" },
+    { type: "dinner", label: "夕食", icon: "moon-outline" },
   ];
 
+  const loadData = async () => {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 7);
+    await fetchMealPlans(today, endDate);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [refresh]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // 今日の献立を抽出（mealPlanIdを含める）
   const todaysMeals = mealPlans?.reduce((acc, meal) => {
     if (meal.date === format(new Date(), "yyyy-MM-dd")) {
       if (!acc[meal.meal_type]) {
         acc[meal.meal_type] = [];
       }
-      acc[meal.meal_type].push({ recipe: meal.recipe! });
+      acc[meal.meal_type].push({
+        id: meal.id,
+        recipe: meal.recipe!,
+      });
     }
     return acc;
-  }, {} as Record<MealType, Array<{ recipe: Recipe }>>);
+  }, {} as Record<MealType, Array<{ id: string; recipe: Recipe }>>);
 
   const handlePressEmptyMeal = (type: MealType) => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -68,8 +78,35 @@ export default function HomeScreen() {
       params: {
         date: today,
         mealType: type,
+        from: "home", // fromパラメータを追加
       },
     });
+  };
+
+  const handleDelete = async (mealPlanId: string) => {
+    Alert.alert("メニューの削除", "このメニューを削除しますか？", [
+      {
+        text: "キャンセル",
+        style: "cancel",
+      },
+      {
+        text: "削除",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const success = await deleteMealPlan(mealPlanId);
+            if (success) {
+              await loadData(); // データを再読み込み
+            } else {
+              Alert.alert("エラー", "削除に失敗しました。");
+            }
+          } catch (error) {
+            console.error("Failed to delete meal plan:", error);
+            Alert.alert("エラー", "削除中にエラーが発生しました。");
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -83,9 +120,14 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.mealsSection}>
-          {mealTypes.map(({ type, label, icon, color }) => (
+          {mealTypes.map(({ type, label, icon }) => (
             <View key={type} style={styles.mealCard}>
-              <View style={[styles.mealHeader, { backgroundColor: color }]}>
+              <View
+                style={[
+                  styles.mealHeader,
+                  { backgroundColor: COLORS.mealTypes[type] },
+                ]}
+              >
                 <Ionicons name={icon} size={24} color="white" />
                 <ThemedText style={styles.mealLabel}>{label}</ThemedText>
                 <Pressable
@@ -98,12 +140,18 @@ export default function HomeScreen() {
                   <Ionicons name="add-circle" size={24} color="white" />
                 </Pressable>
               </View>
+
               <View style={styles.mealContent}>
                 {todaysMeals?.[type]?.length > 0 ? (
                   <View style={styles.recipeList}>
                     {todaysMeals[type].map((meal, index) => (
                       <View key={index} style={styles.recipeItem}>
-                        <RecipeCard recipe={meal.recipe} compact />
+                        <RecipeCard
+                          recipe={meal.recipe}
+                          compact
+                          mealPlanId={meal.id}
+                          onDelete={() => handleDelete(meal.id)}
+                        />
                       </View>
                     ))}
                   </View>
@@ -119,9 +167,9 @@ export default function HomeScreen() {
                       <Ionicons
                         name="add-circle-outline"
                         size={24}
-                        color={color}
+                        color="#718096"
                       />
-                      <ThemedText style={[styles.emptyText, { color }]}>
+                      <ThemedText style={styles.emptyText}>
                         タップしてメニューを設定
                       </ThemedText>
                     </View>
@@ -174,8 +222,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 24,
     backgroundColor: COLORS.card,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
   },
   welcomeText: {
     fontSize: 28,
@@ -197,7 +243,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     elevation: 3,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
@@ -239,6 +288,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyText: {
+    color: "#718096",
     fontSize: 14,
     marginTop: 8,
   },

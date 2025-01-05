@@ -14,13 +14,9 @@ export interface MealPlan {
   created_at?: string;
 }
 
+// hooks/useMealPlan.ts
 export function useMealPlans() {
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
-  const [todaysMeals, setTodaysMeals] = useState<Record<MealType, { recipe: Recipe } | undefined>>({
-    breakfast: undefined,
-    lunch: undefined,
-    dinner: undefined,
-  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,16 +37,14 @@ export function useMealPlans() {
       setMealPlans(data || []);
       return data;
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      }
+      console.error(err);
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const addMealPlan = async (mealPlan: Omit<MealPlan, 'id' | 'created_at'>) => {
+  const addMealPlan = async (mealPlan: Omit<MealPlan, 'id'>) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -64,34 +58,54 @@ export function useMealPlans() {
 
       if (error) throw error;
 
-      // 新しいデータを既存のmealPlansに追加
+      // 新しいデータを即座に状態に反映
       setMealPlans(prev => [data, ...prev]);
-
+      
       return data;
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      }
+      console.error(err);
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  // 初期データ取得
+  // hooks/useMealPlans.ts に deleteMealPlan を追加
+const deleteMealPlan = async (id: string) => {
+  try {
+    setLoading(true);
+    const { error } = await supabase
+      .from('meal_plans')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    
+    // 削除後にステートを更新
+    setMealPlans(prev => prev.filter(plan => plan.id !== id));
+    return true;
+  } catch (err) {
+    console.error(err);
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // 初回マウント時にデータを取得
   useEffect(() => {
     const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
-    fetchMealPlans(today, nextWeek);
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 7);
+    fetchMealPlans(today, endDate);
   }, []);
 
   return {
     mealPlans,
-    todaysMeals,
     loading,
     error,
     fetchMealPlans,
     addMealPlan,
+    deleteMealPlan,
   };
 }

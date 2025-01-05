@@ -1,8 +1,15 @@
 // components/meal-plan/DayPlan.tsx
-import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+  RefreshControl,
+  Alert,
+} from "react-native";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { ThemedView } from "../ui/ThemedView";
 import { ThemedText } from "../ui/ThemedText";
 import { RecipeCard } from "../recipe/RecipeCard";
@@ -11,7 +18,6 @@ import { MealType } from "../../types/mealPlans";
 import { useMealPlans } from "../../hooks/useMealPlan";
 import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { RefreshControl } from "react-native";
 
 const COLORS = {
   primary: "#FF6B6B",
@@ -32,7 +38,10 @@ const COLORS = {
 };
 
 interface DailyMeals {
-  [key: string]: Array<{ recipe: Recipe }>;
+  [key: string]: Array<{
+    id: string;
+    recipe: Recipe;
+  }>;
 }
 
 interface DayPlanProps {
@@ -55,6 +64,7 @@ export function WeeklyMealPlan() {
     {}
   );
   const { fetchMealPlans, loading, mealPlans } = useMealPlans();
+  const { refresh } = useLocalSearchParams();
 
   const today = new Date();
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -63,7 +73,11 @@ export function WeeklyMealPlan() {
     return date;
   });
 
-  useEffect(() => {
+  const loadMeals = async () => {
+    const startDate = weekDays[0];
+    const endDate = weekDays[weekDays.length - 1];
+    const mealPlans = await fetchMealPlans(startDate, endDate);
+
     if (mealPlans) {
       const groupedMeals: Record<string, DailyMeals> = {};
       mealPlans.forEach((plan) => {
@@ -75,18 +89,17 @@ export function WeeklyMealPlan() {
           groupedMeals[dateKey][plan.meal_type] = [];
         }
         groupedMeals[dateKey][plan.meal_type].push({
+          id: plan.id,
           recipe: plan.recipe!,
         });
       });
       setWeeklyMeals(groupedMeals);
     }
-  }, [mealPlans]);
-
-  const loadMeals = async () => {
-    const startDate = weekDays[0];
-    const endDate = weekDays[weekDays.length - 1];
-    await fetchMealPlans(startDate, endDate);
   };
+
+  useEffect(() => {
+    loadMeals();
+  }, [refresh]);
 
   useEffect(() => {
     loadMeals();
@@ -112,21 +125,43 @@ export function WeeklyMealPlan() {
           />
         </View>
       ))}
+      <View style={styles.bottomPadding} />
     </ScrollView>
   );
 }
 
-export function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
+function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
+  const { deleteMealPlan } = useMealPlans();
   const mealTypes: MealType[] = ["breakfast", "lunch", "dinner"];
 
   const handlePress = (type: MealType) => {
     router.push({
-      pathname: "/plans/create",
+      pathname: "/(tabs)/plans/create",
       params: {
         date: format(date, "yyyy-MM-dd"),
         mealType: type,
+        from: "calendar", // fromパラメータを追加
       },
     });
+  };
+
+  const handleDelete = async (mealPlanId: string) => {
+    Alert.alert("メニューの削除", "このメニューを削除しますか？", [
+      {
+        text: "キャンセル",
+        style: "cancel",
+      },
+      {
+        text: "削除",
+        style: "destructive",
+        onPress: async () => {
+          const success = await deleteMealPlan(mealPlanId);
+          if (success && onUpdate) {
+            onUpdate();
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -142,6 +177,17 @@ export function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
               { backgroundColor: COLORS.mealTypes[type] },
             ]}
           >
+            <Ionicons
+              name={
+                type === "breakfast"
+                  ? "sunny-outline"
+                  : type === "lunch"
+                  ? "restaurant-outline"
+                  : "moon-outline"
+              }
+              size={24}
+              color="white"
+            />
             <ThemedText style={styles.mealType}>
               {getMealTypeLabel(type)}
             </ThemedText>
@@ -160,7 +206,12 @@ export function DayPlan({ date, meals, onUpdate }: DayPlanProps) {
               <View style={styles.recipeList}>
                 {meals[type].map((meal, index) => (
                   <View key={index} style={styles.recipeItem}>
-                    <RecipeCard recipe={meal.recipe} compact />
+                    <RecipeCard
+                      recipe={meal.recipe}
+                      compact
+                      mealPlanId={meal.id}
+                      onDelete={() => handleDelete(meal.id)}
+                    />
                   </View>
                 ))}
               </View>
@@ -192,7 +243,7 @@ const styles = StyleSheet.create({
   dayContainer: {
     margin: 16,
     backgroundColor: COLORS.card,
-    borderRadius: 16,
+    borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -200,7 +251,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   container: {
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: "hidden",
   },
   date: {
@@ -218,14 +269,16 @@ const styles = StyleSheet.create({
   },
   mealHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
+    justifyContent: "space-between",
   },
   mealType: {
     fontSize: 16,
     fontWeight: "600",
     color: "white",
+    flex: 1,
+    marginLeft: 8,
   },
   mealContent: {
     padding: 16,
@@ -254,5 +307,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  bottomPadding: {
+    height: 32,
   },
 });

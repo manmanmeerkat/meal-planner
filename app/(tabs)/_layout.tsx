@@ -1,7 +1,17 @@
-import { Tabs } from "expo-router";
+// app/(tabs)/_layout.tsx
+import { Tabs, router } from "expo-router";
 import { HapticTab } from "../../components/ui/HapticTab";
+import { Pressable } from "react-native";
 
 export default function TabLayout() {
+  // タブを押したときのハンドラー
+  const handleTabPress = (route: string) => {
+    router.push({
+      pathname: route === "index" ? "/(tabs)" : "/(tabs)/plans",
+      params: { refresh: Date.now().toString() },
+    });
+  };
+
   return (
     <Tabs
       screenOptions={{
@@ -16,6 +26,9 @@ export default function TabLayout() {
         options={{
           title: "ホーム",
           tabBarIcon: ({ color }) => <HapticTab icon="home" color={color} />,
+          tabBarButton: (props) => (
+            <Pressable {...props} onPress={() => handleTabPress("index")} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -36,6 +49,9 @@ export default function TabLayout() {
             <HapticTab icon="calendar" color={color} />
           ),
           headerShown: false,
+          tabBarButton: (props) => (
+            <Pressable {...props} onPress={() => handleTabPress("plans")} />
+          ),
         }}
       />
     </Tabs>
