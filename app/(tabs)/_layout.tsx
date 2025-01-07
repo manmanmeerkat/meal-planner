@@ -6,8 +6,15 @@ import { Pressable } from "react-native";
 export default function TabLayout() {
   // タブを押したときのハンドラー
   const handleTabPress = (route: string) => {
+    const path =
+      route === "index"
+        ? "/(tabs)"
+        : route === "recipes"
+        ? "/(tabs)/recipes"
+        : "/(tabs)/plans";
+
     router.push({
-      pathname: route === "index" ? "/(tabs)" : "/(tabs)/plans",
+      pathname: path,
       params: { refresh: Date.now().toString() },
     });
   };
@@ -40,6 +47,9 @@ export default function TabLayout() {
             <HapticTab icon="book-open" color={color} />
           ),
           headerShown: false,
+          tabBarButton: (props) => (
+            <Pressable {...props} onPress={() => handleTabPress("recipes")} />
+          ),
         }}
       />
       <Tabs.Screen

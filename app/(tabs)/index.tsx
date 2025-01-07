@@ -71,7 +71,6 @@ export default function HomeScreen() {
     }));
   };
 
-  // 今日の献立を抽出（mealPlanIdを含める）
   const todaysMeals = mealPlans?.reduce((acc, meal) => {
     if (meal.date === format(new Date(), "yyyy-MM-dd")) {
       if (!acc[meal.meal_type]) {
@@ -181,6 +180,15 @@ export default function HomeScreen() {
                             compact
                             mealPlanId={meal.id}
                             onDelete={() => handleDelete(meal.id)}
+                            onPress={() =>
+                              router.push({
+                                pathname: "/(tabs)/recipes/[id]",
+                                params: {
+                                  id: meal.recipe.id,
+                                  from: "home",
+                                },
+                              })
+                            }
                           />
                         </View>
                       ))}
@@ -291,6 +299,9 @@ const styles = StyleSheet.create({
   },
   recipeItem: {
     marginBottom: 8,
+  },
+  recipeListItem: {
+    width: "100%",
   },
   emptyMeal: {
     padding: 24,

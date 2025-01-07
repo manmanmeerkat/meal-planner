@@ -4,6 +4,7 @@ import { ThemedView } from "../../../components/ui/ThemedView";
 import { ThemedText } from "../../../components/ui/ThemedText";
 import { WeeklyMealPlan } from "../../../components/meal-plan/DayPlan";
 import { useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
 
 const COLORS = {
   primary: "#FF6B6B",
@@ -13,6 +14,7 @@ const COLORS = {
 
 export default function PlanIndex() {
   const { refresh } = useLocalSearchParams<{ refresh: string }>();
+  const router = useRouter();
 
   return (
     <ThemedView style={styles.container}>

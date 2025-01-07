@@ -36,10 +36,14 @@ export default function RecipeList() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTime, setSelectedTime] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const { refresh } = useLocalSearchParams<{ refresh: string }>();
 
   useEffect(() => {
-    fetchRecipes();
+    const loadData = async () => {
+      await fetchRecipes(true);
+    };
+    loadData();
   }, [refresh]);
 
   const filteredRecipes = recipes.filter((recipe) => {
@@ -70,8 +74,21 @@ export default function RecipeList() {
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <ThemedText style={styles.title}>マイレシピ</ThemedText>
+          <ThemedText style={styles.title}>レシピ一覧</ThemedText>
           <View style={styles.headerButtons}>
+            <Pressable
+              onPress={() => setShowSearch(!showSearch)}
+              style={({ pressed }) => [
+                styles.iconButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons
+                name="search"
+                size={24}
+                color={showSearch ? "white" : "rgba(255, 255, 255, 0.8)"}
+              />
+            </Pressable>
             <Pressable
               onPress={() => setShowFilters(!showFilters)}
               style={({ pressed }) => [
@@ -102,19 +119,21 @@ export default function RecipeList() {
         </View>
       </View>
 
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color={COLORS.text.secondary} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="レシピ・材料を検索"
-            style={styles.searchInput}
-            clearButtonMode="while-editing"
-            placeholderTextColor={COLORS.text.secondary}
-          />
+      {showSearch && (
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color={COLORS.text.secondary} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="レシピ・材料を検索"
+              style={styles.searchInput}
+              clearButtonMode="while-editing"
+              placeholderTextColor={COLORS.text.secondary}
+            />
+          </View>
         </View>
-      </View>
+      )}
 
       {showFilters && (
         <View style={styles.filtersContainer}>
@@ -189,7 +208,15 @@ export default function RecipeList() {
           filteredRecipes.map((recipe) => (
             <Pressable
               key={recipe.id}
-              onPress={() => router.push(`/recipes/${recipe.id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: "/(tabs)/recipes/[id]",
+                  params: {
+                    id: recipe.id,
+                    from: "recipes",
+                  },
+                })
+              }
               style={({ pressed }) => [
                 styles.recipeCard,
                 pressed && styles.pressed,
@@ -232,15 +259,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    backgroundColor: COLORS.secondary,
-    paddingTop: 20,
+    backgroundColor: "#3B82F6",
+    paddingTop: 32, // iOSのステータスバーの高さを考慮
   },
   headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    paddingBottom: 20,
+    padding: 16, // 上下左右均等なパディング
   },
   title: {
     fontSize: 28,

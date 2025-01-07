@@ -1,5 +1,11 @@
 // components/recipe/RecipeCard.tsx
-import { View, Image, StyleSheet, Pressable } from "react-native";
+import {
+  View,
+  Image,
+  StyleSheet,
+  Pressable,
+  GestureResponderEvent,
+} from "react-native";
 import { ThemedText } from "../ui/ThemedText";
 import { Recipe } from "../../types/recipe";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,7 +27,7 @@ interface RecipeCardProps {
   recipe: Recipe;
   compact?: boolean;
   mealPlanId?: string;
-  onDelete?: () => void;
+  onDelete?: (e?: GestureResponderEvent) => void;
   onPress?: () => void;
 }
 
@@ -117,7 +123,11 @@ export function RecipeCard({
     return (
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => pressed && styles.pressed}
+        style={({ pressed }) => [
+          styles.card,
+          compact && styles.compactCard,
+          pressed && styles.pressed,
+        ]}
       >
         {renderContent()}
       </Pressable>

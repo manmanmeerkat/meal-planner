@@ -6,6 +6,7 @@ import {
   Pressable,
   Switch,
   Alert,
+  Image,
 } from "react-native";
 import { ThemedText } from "../ui/ThemedText";
 import { Button } from "../ui/Button";
@@ -14,6 +15,9 @@ import { Recipe } from "../../types/recipe";
 import { CATEGORIES } from "../../constants/recipeFilters";
 import { Input } from "../ui/Input";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useSupabaseStorage } from "../../hooks/useSupabaseStorage";
+import { router } from "expo-router";
 
 interface RecipeFormProps {
   onSubmit: (data: Omit<Recipe, "id">) => void;
@@ -39,6 +43,12 @@ const COLORS = {
   },
 };
 
+const DEFAULT_IMAGES = [
+  "https://via.placeholder.com/400x300/F5F7FA/718096?text=Recipe",
+  "https://via.placeholder.com/400x300/F5F7FA/718096?text=Food",
+  "https://via.placeholder.com/400x300/F5F7FA/718096?text=Cooking",
+];
+
 export function RecipeForm({
   onSubmit,
   initialData,
@@ -60,6 +70,8 @@ export function RecipeForm({
     initialData?.ingredients ?? [{ name: "", amount: "" }]
   );
   const [steps, setSteps] = useState<string[]>(initialData?.steps ?? [""]);
+  const [imageUrl, setImageUrl] = useState(initialData?.image_url ?? "");
+  const { uploadRecipeImage } = useSupabaseStorage();
 
   const [errors, setErrors] = useState<{
     title?: string;
@@ -95,6 +107,45 @@ export function RecipeForm({
       );
     } else {
       setIsSimpleMode(newMode);
+    }
+  };
+  const pickImage = async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert("エラー", "画像へのアクセス権限が必要です。");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        try {
+          // URIを文字列として直接渡す
+          const url = await uploadRecipeImage(result.assets[0].uri);
+          if (url) {
+            setImageUrl(url);
+          } else {
+            Alert.alert("エラー", "画像のアップロードに失敗しました。");
+          }
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          Alert.alert(
+            "エラー",
+            "画像のアップロードに失敗しました。\nネットワーク接続を確認してください。"
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("エラー", "画像の選択中にエラーが発生しました。");
     }
   };
 
@@ -158,24 +209,18 @@ export function RecipeForm({
     return Object.keys(newErrors).length === 0;
   };
 
-  const DEFAULT_IMAGES = [
-    "https://via.placeholder.com/400x300/F5F7FA/718096?text=Recipe",
-    "https://via.placeholder.com/400x300/F5F7FA/718096?text=Food",
-    "https://via.placeholder.com/400x300/F5F7FA/718096?text=Cooking",
-  ];
-
-  // ランダムに1つ選択する場合
-  const DEFAULT_IMAGE_URL =
-    DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)];
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
+
+    const DEFAULT_IMAGE_URL =
+      DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)];
 
     const recipeData = {
       title,
       category,
       image_url: isSimpleMode
         ? DEFAULT_IMAGE_URL
-        : initialData?.image_url ?? "",
+        : imageUrl || DEFAULT_IMAGE_URL,
       calories: initialData?.calories ?? 0,
       ...(isSimpleMode
         ? {
@@ -194,121 +239,17 @@ export function RecipeForm({
           }),
     };
 
-    onSubmit(recipeData);
+    try {
+      await onSubmit(recipeData);
+      // 保存成功後にレシピ一覧画面に遷移
+      router.push({
+        pathname: "/(tabs)/recipes",
+        params: { refresh: Date.now() }, // リフレッシュパラメータを追加して新しいレシピが表示されるようにする
+      });
+    } catch (error) {
+      Alert.alert("エラー", "レシピの保存に失敗しました。");
+    }
   };
-
-  const styles = StyleSheet.create({
-    scroll: {
-      flex: 1,
-      backgroundColor: COLORS.background,
-    },
-    container: {
-      padding: 16,
-    },
-    modeSwitch: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: 16,
-      backgroundColor: COLORS.card,
-      borderRadius: 12,
-      marginBottom: 16,
-    },
-    modeSwitchText: {
-      fontSize: 16,
-      fontWeight: "500",
-      color: COLORS.text.primary,
-    },
-    section: {
-      backgroundColor: COLORS.card,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: "600",
-      marginBottom: 16,
-      color: COLORS.text.primary,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: "500",
-      marginBottom: 8,
-      color: COLORS.text.secondary,
-    },
-    row: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-    },
-    spacer: {
-      width: 12,
-    },
-    flex1: {
-      flex: 1,
-    },
-    flex2: {
-      flex: 2,
-    },
-    categorySection: {
-      marginTop: 16,
-    },
-    categoryList: {
-      flexGrow: 0,
-    },
-    categoryChip: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: COLORS.background,
-      marginRight: 8,
-      borderWidth: 1,
-      borderColor: "#E2E8F0",
-    },
-    categoryChipSelected: {
-      backgroundColor: COLORS.primary,
-      borderColor: COLORS.primary,
-    },
-    categoryChipText: {
-      fontSize: 14,
-      color: COLORS.text.primary,
-    },
-    categoryChipTextSelected: {
-      color: "white",
-    },
-    ingredientRow: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      marginBottom: 12,
-    },
-    stepContainer: {
-      marginBottom: 16,
-    },
-    stepHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 8,
-    },
-    stepNumber: {
-      fontSize: 16,
-      fontWeight: "500",
-      color: COLORS.text.primary,
-    },
-    addButton: {
-      marginTop: 8,
-    },
-    removeButton: {
-      marginLeft: 8,
-    },
-    submitButton: {
-      marginTop: 8,
-      marginBottom: 32,
-    },
-    pressed: {
-      opacity: 0.7,
-    },
-  });
 
   return (
     <ScrollView style={styles.scroll}>
@@ -366,6 +307,35 @@ export function RecipeForm({
 
         {!isSimpleMode && (
           <>
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>画像</ThemedText>
+              <Pressable
+                onPress={pickImage}
+                style={({ pressed }) => [
+                  styles.imagePickerButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {imageUrl ? (
+                  <Image
+                    source={{ uri: imageUrl }}
+                    style={styles.previewImage}
+                  />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <Ionicons
+                      name="camera-outline"
+                      size={32}
+                      color={COLORS.text.secondary}
+                    />
+                    <ThemedText style={styles.imagePlaceholderText}>
+                      タップして画像を選択
+                    </ThemedText>
+                  </View>
+                )}
+              </Pressable>
+            </View>
+
             <View style={styles.section}>
               <ThemedText style={styles.sectionTitle}>詳細情報</ThemedText>
               <Input
@@ -490,3 +460,139 @@ export function RecipeForm({
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  container: {
+    padding: 16,
+  },
+  modeSwitch: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+
+  modeSwitchText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: COLORS.text.primary,
+  },
+  section: {
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 16,
+    color: COLORS.text.primary,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "500",
+    marginBottom: 8,
+    color: COLORS.text.secondary,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  spacer: {
+    width: 12,
+  },
+  flex1: {
+    flex: 1,
+  },
+  flex2: {
+    flex: 2,
+  },
+  categorySection: {
+    marginTop: 16,
+  },
+  categoryList: {
+    flexGrow: 0,
+  },
+  categoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  categoryChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  categoryChipText: {
+    fontSize: 14,
+    color: COLORS.text.primary,
+  },
+  categoryChipTextSelected: {
+    color: "white",
+  },
+  imagePickerButton: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: COLORS.background,
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  imagePlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.background,
+  },
+  imagePlaceholderText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: COLORS.text.secondary,
+  },
+  ingredientRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginBottom: 12,
+  },
+  stepContainer: {
+    marginBottom: 16,
+  },
+  stepHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  stepNumber: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: COLORS.text.primary,
+  },
+  addButton: {
+    marginTop: 8,
+  },
+  removeButton: {
+    marginLeft: 8,
+  },
+  submitButton: {
+    marginTop: 8,
+    marginBottom: 32,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+});

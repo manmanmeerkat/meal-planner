@@ -37,14 +37,12 @@ export default function EditRecipe() {
   };
 
   const handleSubmit = async (data: Omit<Recipe, "id">) => {
-    setLoading(true);
-    try {
-      await updateRecipe(id as string, data);
-      router.push(`/recipes/${id}`);
-    } catch (error) {
-      console.error("Failed to update recipe:", error);
-    } finally {
-      setLoading(false);
+    const result = await updateRecipe(id as string, data);
+    if (result) {
+      router.push({
+        pathname: "/(tabs)/recipes",
+        params: { refresh: Date.now().toString() },
+      });
     }
   };
 

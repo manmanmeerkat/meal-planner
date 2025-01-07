@@ -8,7 +8,7 @@ export function useRecipes() {
  const [loading, setLoading] = useState(false);
  const [error, setError] = useState<string | null>(null);
 
- const fetchRecipes = async () => {
+ const fetchRecipes = async (forceRefresh = true) => {
    try {
      setLoading(true);
      const { data, error } = await supabase
