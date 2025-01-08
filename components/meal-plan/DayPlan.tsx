@@ -281,6 +281,15 @@ function DayPlan({
                         compact
                         mealPlanId={meal.id}
                         onDelete={() => handleDelete(meal.id)}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/recipes/[id]" as const,
+                            params: {
+                              id: meal.recipe.id,
+                              from: "plans",
+                            },
+                          })
+                        }
                       />
                     </View>
                   ))}

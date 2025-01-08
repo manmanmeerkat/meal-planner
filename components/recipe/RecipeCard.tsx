@@ -11,15 +11,20 @@ import { Recipe } from "../../types/recipe";
 import { Ionicons } from "@expo/vector-icons";
 
 const COLORS = {
-  primary: "#FF6B6B",
+  primary: "#3B82F6",
   secondary: "#4ECDC4",
-  accent: "#FFE66D",
-  background: "#F7F9FC",
+  background: "#F8FAFC",
   card: "#FFFFFF",
   text: {
-    primary: "#2D3748",
-    secondary: "#718096",
-    accent: "#FF6B6B",
+    primary: "#1E293B",
+    secondary: "#64748B",
+  },
+  border: "#E2E8F0",
+  cardBg: {
+    blue: "#EBF3FF",
+    teal: "#E6FAF8",
+    orange: "#FFF3E6",
+    purple: "#F3F1FF",
   },
 };
 
@@ -126,7 +131,7 @@ export function RecipeCard({
         style={({ pressed }) => [
           styles.card,
           compact && styles.compactCard,
-          pressed && styles.pressed,
+          pressed && styles.cardPressed,
         ]}
       >
         {renderContent()}
@@ -143,28 +148,30 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   compactCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    minHeight: 60,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    minHeight: 50,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: COLORS.card,
   },
   image: {
     width: "100%",
-    height: 180,
+    height: 200,
     backgroundColor: COLORS.background,
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
   },
   titleContainer: {
     flexDirection: "row",
@@ -172,14 +179,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "600",
     color: COLORS.text.primary,
     flex: 1,
     marginRight: 8,
   },
   compactTitle: {
-    fontSize: 14,
+    fontSize: 17,
+    fontWeight: "600",
+    color: COLORS.text.primary,
   },
   description: {
     fontSize: 14,
@@ -189,23 +198,31 @@ const styles = StyleSheet.create({
   },
   metaInfo: {
     flexDirection: "row",
-    marginTop: 12,
-    gap: 16,
+    marginTop: 10,
+    gap: 12,
     flexWrap: "wrap",
   },
   metaItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   metaText: {
     fontSize: 14,
     color: COLORS.text.secondary,
+    fontWeight: "500",
   },
   deleteButton: {
     padding: 4,
+    marginLeft: 4,
   },
   pressed: {
     opacity: 0.7,
+  },
+  cardPressed: {
+    backgroundColor: "#F8FAFC",
+    transform: [{ scale: 0.995 }],
   },
 });
