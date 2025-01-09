@@ -1,19 +1,21 @@
-// app/(tabs)/recipes/index.tsx
+// app/(tabs)/plans/create.tsx
+import { useState, useEffect } from "react";
 import {
   View,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
   Pressable,
-  ActivityIndicator,
   TextInput,
+  ActivityIndicator,
 } from "react-native";
-import { useState, useEffect } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { ThemedView } from "../../../components/ui/ThemedView";
 import { ThemedText } from "../../../components/ui/ThemedText";
 import { RecipeCard } from "../../../components/recipe/RecipeCard";
+import { useMealPlans } from "../../../hooks/useMealPlan";
 import { useRecipes } from "../../../hooks/useRecipes";
 import { Ionicons } from "@expo/vector-icons";
+import { MealType } from "../../../types/mealPlans";
 import { CATEGORIES, COOKING_TIMES } from "../../../constants/recipeFilters";
 
 const COLORS = {
@@ -27,24 +29,49 @@ const COLORS = {
     secondary: "#718096",
     accent: "#FF6B6B",
   },
+  mealTypes: {
+    breakfast: "#FFB347",
+    lunch: "#4ECDC4",
+    dinner: "#A78BFA",
+  },
 };
 
-export default function RecipeList() {
+export default function CreatePlan() {
+  const params = useLocalSearchParams();
+  const { addMealPlan } = useMealPlans();
   const { recipes, fetchRecipes, loading } = useRecipes();
-  const [isCompact, setIsCompact] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCompact, setIsCompact] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTime, setSelectedTime] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const { refresh } = useLocalSearchParams<{ refresh: string }>();
 
   useEffect(() => {
-    const loadData = async () => {
-      await fetchRecipes(true);
-    };
-    loadData();
-  }, [refresh]);
+    fetchRecipes();
+  }, []);
+
+  const handleSelectRecipe = async (recipeId: string) => {
+    if (!params.date || !params.mealType) return;
+
+    const result = await addMealPlan({
+      date: params.date as string,
+      meal_type: params.mealType as MealType,
+      recipe_id: recipeId,
+    });
+
+    const destination = params.from === "home" ? "/(tabs)" : "/(tabs)/plans";
+    router.push({
+      pathname: destination,
+      params: { refresh: Date.now() },
+    });
+  };
+
+  const getMealTypeColor = (mealType: string) => {
+    return (
+      COLORS.mealTypes[mealType as keyof typeof COLORS.mealTypes] ||
+      COLORS.primary
+    );
+  };
 
   const filteredRecipes = recipes.filter((recipe) => {
     const matchesQuery =
@@ -72,27 +99,28 @@ export default function RecipeList() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <ThemedText style={styles.title}>レシピ一覧</ThemedText>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: getMealTypeColor(params.mealType as string) },
+        ]}
+      >
+        <View style={styles.headerTop}>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </Pressable>
+          <ThemedText style={styles.title}>レシピを選択</ThemedText>
           <View style={styles.headerButtons}>
-            <Pressable
-              onPress={() => setShowSearch(!showSearch)}
-              style={({ pressed }) => [
-                styles.iconButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Ionicons
-                name="search"
-                size={24}
-                color={showSearch ? "white" : "rgba(255, 255, 255, 0.8)"}
-              />
-            </Pressable>
             <Pressable
               onPress={() => setShowFilters(!showFilters)}
               style={({ pressed }) => [
-                styles.iconButton,
+                styles.headerButton,
                 pressed && styles.pressed,
               ]}
             >
@@ -105,42 +133,40 @@ export default function RecipeList() {
             <Pressable
               onPress={() => setIsCompact(!isCompact)}
               style={({ pressed }) => [
-                styles.iconButton,
+                styles.headerButton,
                 pressed && styles.pressed,
               ]}
             >
               <Ionicons
                 name={isCompact ? "list" : "grid"}
                 size={24}
-                color="rgba(255, 255, 255, 0.8)"
+                color="white"
               />
             </Pressable>
           </View>
         </View>
       </View>
 
-      {showSearch && (
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color={COLORS.text.secondary} />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="レシピ・材料を検索"
-              style={styles.searchInput}
-              clearButtonMode="while-editing"
-              placeholderTextColor={COLORS.text.secondary}
-            />
-          </View>
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color={COLORS.text.secondary} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="レシピ・材料を検索"
+            style={styles.searchInput}
+            clearButtonMode="while-editing"
+            placeholderTextColor={COLORS.text.secondary}
+          />
         </View>
-      )}
+      </View>
 
       {showFilters && (
         <View style={styles.filtersContainer}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.filterSection}
+            contentContainerStyle={styles.filterList}
           >
             <ThemedText style={styles.filterLabel}>カテゴリー:</ThemedText>
             {CATEGORIES.map((category) => (
@@ -169,7 +195,7 @@ export default function RecipeList() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.filterSection}
+            contentContainerStyle={[styles.filterList, styles.filterListSecond]}
           >
             <ThemedText style={styles.filterLabel}>調理時間:</ThemedText>
             {COOKING_TIMES.map((time) => (
@@ -198,6 +224,7 @@ export default function RecipeList() {
 
       <ScrollView
         style={styles.content}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
         {loading ? (
@@ -205,50 +232,33 @@ export default function RecipeList() {
             <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
         ) : filteredRecipes.length > 0 ? (
-          filteredRecipes.map((recipe) => (
-            <Pressable
-              key={recipe.id}
-              onPress={() =>
-                router.push({
-                  pathname: "/(tabs)/recipes/[id]",
-                  params: {
-                    id: recipe.id,
-                    from: "recipes",
-                  },
-                })
-              }
-              style={({ pressed }) => [
-                styles.recipeCard,
-                pressed && styles.pressed,
-              ]}
-            >
-              <RecipeCard recipe={recipe} compact={isCompact} />
-            </Pressable>
-          ))
+          <View style={styles.recipeList}>
+            {filteredRecipes.map((recipe) => (
+              <Pressable
+                key={recipe.id}
+                onPress={() => handleSelectRecipe(recipe.id)}
+                style={({ pressed }) => [
+                  styles.recipeCard,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <RecipeCard recipe={recipe} compact={isCompact} />
+              </Pressable>
+            ))}
+          </View>
         ) : (
           <View style={styles.emptyContainer}>
             <Ionicons
-              name={searchQuery ? "search-outline" : "book-outline"}
+              name="search-outline"
               size={48}
               color={COLORS.text.secondary}
             />
             <ThemedText style={styles.emptyText}>
-              {searchQuery
-                ? "レシピが見つかりませんでした"
-                : "レシピがありません。\n新しいレシピを追加してみましょう！"}
+              レシピが見つかりませんでした
             </ThemedText>
           </View>
         )}
       </ScrollView>
-
-      <Pressable
-        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
-        onPress={() => router.push("/recipes/create")}
-      >
-        <View style={styles.fabContent}>
-          <Ionicons name="add" size={24} color="white" />
-        </View>
-      </Pressable>
     </ThemedView>
   );
 }
@@ -259,29 +269,34 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    backgroundColor: "#3B82F6",
-    paddingTop: 32, // iOSのステータスバーの高さを考慮
+    paddingTop: 20,
+    backgroundColor: COLORS.primary,
   },
-  headerContent: {
+  headerTop: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    padding: 16, // 上下左右均等なパディング
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "white",
-    letterSpacing: 0.5,
+    justifyContent: "space-between",
+    padding: 16,
+    paddingBottom: 20,
   },
   headerButtons: {
     flexDirection: "row",
     gap: 8,
   },
-  iconButton: {
+  headerButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "white",
+    flex: 1,
+    marginLeft: 12,
   },
   searchContainer: {
     padding: 16,
@@ -307,11 +322,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
-  filterSection: {
+  filterList: {
     paddingHorizontal: 16,
-    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  filterListSecond: {
+    marginTop: 8,
   },
   filterLabel: {
     fontSize: 14,
@@ -320,10 +339,10 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "#F7FAFC",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
     marginRight: 8,
     borderWidth: 1,
     borderColor: "#E2E8F0",
@@ -344,10 +363,18 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 80,
+  },
+  recipeList: {
+    gap: 16,
   },
   recipeCard: {
-    marginBottom: 16,
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   loadingContainer: {
     flex: 1,
@@ -365,30 +392,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.text.secondary,
     textAlign: "center",
-    lineHeight: 24,
     marginTop: 16,
-  },
-  fab: {
-    position: "absolute",
-    right: 16,
-    bottom: 16,
-    borderRadius: 28,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  fabContent: {
-    width: 56,
-    height: 56,
-    backgroundColor: COLORS.primary,
-    alignItems: "center",
-    justifyContent: "center",
   },
   pressed: {
     opacity: 0.7,

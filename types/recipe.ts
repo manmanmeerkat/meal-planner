@@ -8,4 +8,6 @@ export interface Recipe {
   cooking_time: number;
   calories: number;
   servings: number;
+  category: string;
+  created_at?: string;
 } 

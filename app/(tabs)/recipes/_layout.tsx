@@ -2,31 +2,11 @@ import { Stack } from "expo-router";
 
 export default function RecipesLayout() {
   return (
-    <Stack>
-      <Stack.Screen
-        name="index"
-        options={{
-          title: "レシピ一覧",
-        }}
-      />
-      <Stack.Screen
-        name="[id]"
-        options={{
-          title: "レシピ詳細",
-        }}
-      />
-      <Stack.Screen
-        name="create"
-        options={{
-          title: "新規作成",
-        }}
-      />
-      <Stack.Screen
-        name="[id]/edit"
-        options={{
-          title: "レシピ編集",
-        }}
-      />
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="[id]" options={{ presentation: "modal" }} />
+      <Stack.Screen name="create" />
+      <Stack.Screen name="edit/[id]" />
     </Stack>
   );
 }

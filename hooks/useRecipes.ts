@@ -1,5 +1,5 @@
 // hooks/useRecipes.ts
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../constants/supabase';
 import { Recipe } from '../types/recipe';
 
@@ -8,121 +8,130 @@ export function useRecipes() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // レシピ一覧取得
-  const fetchRecipes = async () => {
+  const fetchRecipes = async (forceRefresh = true) => {
     try {
       setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const { data, error } = await supabase
         .from('recipes')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRecipes(data);
+      setRecipes(data || []);
+      return data;
     } catch (err) {
+      console.error('Error fetching recipes:', err);
       if (err instanceof Error) {
         setError(err.message);
-      } else {
-        setError('An unknown error occurred');
       }
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  // 単一レシピ取得
   const getRecipe = async (id: string) => {
     try {
       setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const { data, error } = await supabase
         .from('recipes')
         .select('*')
         .eq('id', id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
       return data;
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred');
-      }
+      console.error('Error getting recipe:', err);
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  // レシピ作成
-  const createRecipe = async (recipe: Omit<Recipe, 'id'>) => {
+  const createRecipe = async (recipe: Omit<Recipe, 'id' | 'created_at' | 'user_id'>) => {
     try {
       setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const { data, error } = await supabase
         .from('recipes')
-        .insert([recipe])
-        .select();
+        .insert([{ ...recipe, user_id: user.id }])
+        .select()
+        .single();
 
       if (error) throw error;
-      setRecipes(prev => [...prev, data[0]]);
-      return data[0];
+      setRecipes(prev => [data, ...prev]);
+      return data;
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred');
-      }
+      console.error('Error creating recipe:', err);
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  // レシピ更新
-  const updateRecipe = async (id: string, updates: Partial<Omit<Recipe, 'id'>>) => {
+  const updateRecipe = async (id: string, updates: Partial<Recipe>) => {
     try {
       setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const { data, error } = await supabase
         .from('recipes')
         .update(updates)
         .eq('id', id)
-        .select();
+        .eq('user_id', user.id)
+        .select()
+        .single();
 
       if (error) throw error;
-      setRecipes(prev => prev.map(recipe => 
-        recipe.id === id ? data[0] : recipe
-      ));
-      return data[0];
+
+      setRecipes(prev =>
+        prev.map(recipe => (recipe.id === id ? data : recipe))
+      );
+
+      return data;
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred');
-      }
+      console.error('Error updating recipe:', err);
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  // レシピ削除
   const deleteRecipe = async (id: string) => {
     try {
       setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const { error } = await supabase
         .from('recipes')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
+
       setRecipes(prev => prev.filter(recipe => recipe.id !== id));
       return true;
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred');
-      }
+      console.error('Error deleting recipe:', err);
       return false;
     } finally {
       setLoading(false);
