@@ -6,13 +6,23 @@ import {
   TextInputProps,
   ViewStyle,
   TextStyle,
+  StyleProp,
+  KeyboardTypeOptions,
 } from "react-native";
 import { ThemedText } from "./ThemedText";
 
-interface InputProps extends Omit<TextInputProps, "style"> {
+interface InputProps {
+  label?: string;
+  value: string;
+  onChangeText: (text: string) => void;
   error?: string;
+  placeholder?: string;
   suffix?: string;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
+  multiline?: boolean;
+  keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  secureTextEntry?: boolean;
 }
 
 export function Input({ error, style, suffix, ...props }: InputProps) {

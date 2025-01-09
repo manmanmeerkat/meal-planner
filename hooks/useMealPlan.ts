@@ -1,111 +1,143 @@
-// hooks/useMealPlans.ts
-import { useState, useEffect } from 'react';
+// hooks/useMealPlan.ts
+import { useState } from 'react';
 import { supabase } from '../constants/supabase';
 import { format } from 'date-fns';
 import { MealType } from '../types/mealPlans';
 import { Recipe } from '../types/recipe';
 
 export interface MealPlan {
-  id: string;
-  date: string;
-  meal_type: MealType;
-  recipe_id: string;
-  recipe?: Recipe;
-  created_at?: string;
+ id: string;
+ date: string;
+ meal_type: MealType;
+ recipe_id: string;
+ recipe?: Recipe;
+ created_at?: string;
+ user_id: string;
 }
 
-// hooks/useMealPlan.ts
 export function useMealPlans() {
-  const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+ const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
+ const [loading, setLoading] = useState(false);
+ const [error, setError] = useState<string | null>(null);
 
-  const fetchMealPlans = async (startDate: Date, endDate: Date) => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('meal_plans')
-        .select(`
-          *,
-          recipe:recipes(*)
-        `)
-        .gte('date', format(startDate, 'yyyy-MM-dd'))
-        .lte('date', format(endDate, 'yyyy-MM-dd'))
-        .order('created_at', { ascending: false });
+ const fetchMealPlans = async (startDate: Date, endDate: Date) => {
+   try {
+     setLoading(true);
+     
+     const { data: { user } } = await supabase.auth.getUser();
+     if (!user) throw new Error('Not authenticated');
 
-      if (error) throw error;
-      setMealPlans(data || []);
-      return data;
-    } catch (err) {
-      console.error(err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
+     const { data, error } = await supabase
+       .from('meal_plans')
+       .select(`
+         *,
+         recipe:recipes(*)
+       `)
+       .eq('user_id', user.id)
+       .gte('date', format(startDate, 'yyyy-MM-dd'))
+       .lte('date', format(endDate, 'yyyy-MM-dd'))
+       .order('created_at', { ascending: false });
 
-  const addMealPlan = async (mealPlan: Omit<MealPlan, 'id'>) => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('meal_plans')
-        .insert([mealPlan])
-        .select(`
-          *,
-          recipe:recipes(*)
-        `)
-        .single();
+     if (error) throw error;
+     setMealPlans(data || []);
+     return data;
+   } catch (err) {
+     console.error('Error fetching meal plans:', err);
+     return null;
+   } finally {
+     setLoading(false);
+   }
+ };
 
-      if (error) throw error;
+ const addMealPlan = async (mealPlan: Omit<MealPlan, 'id' | 'created_at' | 'user_id'>) => {
+   try {
+     setLoading(true);
+     
+     const { data: { user } } = await supabase.auth.getUser();
+     if (!user) throw new Error('Not authenticated');
 
-      // 新しいデータを即座に状態に反映
-      setMealPlans(prev => [data, ...prev]);
-      
-      return data;
-    } catch (err) {
-      console.error(err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
+     const { data, error } = await supabase
+       .from('meal_plans')
+       .insert([{ ...mealPlan, user_id: user.id }])
+       .select(`
+         *,
+         recipe:recipes(*)
+       `)
+       .single();
 
-  // hooks/useMealPlans.ts に deleteMealPlan を追加
-const deleteMealPlan = async (id: string) => {
-  try {
-    setLoading(true);
-    const { error } = await supabase
-      .from('meal_plans')
-      .delete()
-      .eq('id', id);
+     if (error) throw error;
+     setMealPlans(prev => [data, ...prev]);
+     return data;
+   } catch (err) {
+     console.error('Error adding meal plan:', err);
+     return null;
+   } finally {
+     setLoading(false);
+   }
+ };
 
-    if (error) throw error;
-    
-    // 削除後にステートを更新
-    setMealPlans(prev => prev.filter(plan => plan.id !== id));
-    return true;
-  } catch (err) {
-    console.error(err);
-    return false;
-  } finally {
-    setLoading(false);
-  }
-};
+ const updateMealPlan = async (id: string, updates: Partial<MealPlan>) => {
+   try {
+     setLoading(true);
+     
+     const { data: { user } } = await supabase.auth.getUser();
+     if (!user) throw new Error('Not authenticated');
 
-  // 初回マウント時にデータを取得
-  useEffect(() => {
-    const today = new Date();
-    const endDate = new Date(today);
-    endDate.setDate(today.getDate() + 7);
-    fetchMealPlans(today, endDate);
-  }, []);
+     const { data, error } = await supabase
+       .from('meal_plans')
+       .update(updates)
+       .eq('id', id)
+       .eq('user_id', user.id)
+       .select(`
+         *,
+         recipe:recipes(*)
+       `)
+       .single();
 
-  return {
-    mealPlans,
-    loading,
-    error,
-    fetchMealPlans,
-    addMealPlan,
-    deleteMealPlan,
-  };
+     if (error) throw error;
+     setMealPlans(prev => 
+       prev.map(plan => plan.id === id ? data : plan)
+     );
+     return data;
+   } catch (err) {
+     console.error('Error updating meal plan:', err);
+     return null;
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ const deleteMealPlan = async (id: string) => {
+   try {
+     setLoading(true);
+     
+     const { data: { user } } = await supabase.auth.getUser();
+     if (!user) throw new Error('Not authenticated');
+
+     const { error } = await supabase
+       .from('meal_plans')
+       .delete()
+       .eq('id', id)
+       .eq('user_id', user.id);
+
+     if (error) throw error;
+     setMealPlans(prev => prev.filter(plan => plan.id !== id));
+     return true;
+   } catch (err) {
+     console.error('Error deleting meal plan:', err);
+     return false;
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ return {
+   mealPlans,
+   loading,
+   error,
+   fetchMealPlans,
+   addMealPlan,
+   updateMealPlan,
+   deleteMealPlan,
+ };
 }

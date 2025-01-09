@@ -4,124 +4,148 @@ import { supabase } from '../constants/supabase';
 import { Recipe } from '../types/recipe';
 
 export function useRecipes() {
- const [recipes, setRecipes] = useState<Recipe[]>([]);
- const [loading, setLoading] = useState(false);
- const [error, setError] = useState<string | null>(null);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
- const fetchRecipes = async (forceRefresh = true) => {
-   try {
-     setLoading(true);
-     const { data, error } = await supabase
-       .from('recipes')
-       .select('*')
-       .order('created_at', { ascending: false });
+  const fetchRecipes = async (forceRefresh = true) => {
+    try {
+      setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-     if (error) throw error;
-     setRecipes(data || []);
-     return data;
-   } catch (err) {
-     console.error('Error fetching recipes:', err);
-     if (err instanceof Error) {
-       setError(err.message);
-     }
-     return null;
-   } finally {
-     setLoading(false);
-   }
- };
+      const { data, error } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
- const getRecipe = async (id: string) => {
-   try {
-     setLoading(true);
-     const { data, error } = await supabase
-       .from('recipes')
-       .select('*')
-       .eq('id', id)
-       .single();
+      if (error) throw error;
+      setRecipes(data || []);
+      return data;
+    } catch (err) {
+      console.error('Error fetching recipes:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      }
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-     if (error) throw error;
-     return data;
-   } catch (err) {
-     console.error('Error getting recipe:', err);
-     return null;
-   } finally {
-     setLoading(false);
-   }
- };
+  const getRecipe = async (id: string) => {
+    try {
+      setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
- const createRecipe = async (recipe: Omit<Recipe, 'id' | 'created_at'>) => {
-   try {
-     setLoading(true);
-     const { data, error } = await supabase
-       .from('recipes')
-       .insert([recipe])
-       .select()
-       .single();
+      const { data, error } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
 
-     if (error) throw error;
-     setRecipes(prev => [data, ...prev]);
-     return data;
-   } catch (err) {
-     console.error('Error creating recipe:', err);
-     return null;
-   } finally {
-     setLoading(false);
-   }
- };
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Error getting recipe:', err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
 
- const updateRecipe = async (id: string, updates: Partial<Recipe>) => {
-   try {
-     setLoading(true);
-     const { data, error } = await supabase
-       .from('recipes')
-       .update(updates)
-       .eq('id', id)
-       .select()
-       .single();
+  const createRecipe = async (recipe: Omit<Recipe, 'id' | 'created_at' | 'user_id'>) => {
+    try {
+      setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-     if (error) throw error;
+      const { data, error } = await supabase
+        .from('recipes')
+        .insert([{ ...recipe, user_id: user.id }])
+        .select()
+        .single();
 
-     setRecipes(prev =>
-       prev.map(recipe => (recipe.id === id ? data : recipe))
-     );
+      if (error) throw error;
+      setRecipes(prev => [data, ...prev]);
+      return data;
+    } catch (err) {
+      console.error('Error creating recipe:', err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-     return data;
-   } catch (err) {
-     console.error('Error updating recipe:', err);
-     return null;
-   } finally {
-     setLoading(false);
-   }
- };
+  const updateRecipe = async (id: string, updates: Partial<Recipe>) => {
+    try {
+      setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
- const deleteRecipe = async (id: string) => {
-   try {
-     setLoading(true);
-     const { error } = await supabase
-       .from('recipes')
-       .delete()
-       .eq('id', id);
+      const { data, error } = await supabase
+        .from('recipes')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
 
-     if (error) throw error;
+      if (error) throw error;
 
-     setRecipes(prev => prev.filter(recipe => recipe.id !== id));
-     return true;
-   } catch (err) {
-     console.error('Error deleting recipe:', err);
-     return false;
-   } finally {
-     setLoading(false);
-   }
- };
+      setRecipes(prev =>
+        prev.map(recipe => (recipe.id === id ? data : recipe))
+      );
 
- return {
-   recipes,
-   loading,
-   error,
-   fetchRecipes,
-   getRecipe,
-   createRecipe,
-   updateRecipe,
-   deleteRecipe,
- };
+      return data;
+    } catch (err) {
+      console.error('Error updating recipe:', err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteRecipe = async (id: string) => {
+    try {
+      setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { error } = await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setRecipes(prev => prev.filter(recipe => recipe.id !== id));
+      return true;
+    } catch (err) {
+      console.error('Error deleting recipe:', err);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    recipes,
+    loading,
+    error,
+    fetchRecipes,
+    getRecipe,
+    createRecipe,
+    updateRecipe,
+    deleteRecipe,
+  };
 }
