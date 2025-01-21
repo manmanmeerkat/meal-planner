@@ -1,58 +1,17 @@
 // app/(tabs)/_layout.tsx
 import { Tabs } from "expo-router";
 import { HapticTab } from "../../components/ui/HapticTab";
-import { Pressable, Alert } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "../../hooks/useAuth";
 import { router } from "expo-router";
 
 export default function TabLayout() {
-  const { signOut } = useAuth();
-
-  const handleSignOut = () => {
-    Alert.alert(
-      "サインアウト",
-      "本当にサインアウトしますか？",
-      [
-        {
-          text: "キャンセル",
-          style: "cancel",
-        },
-        {
-          text: "サインアウト",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await signOut();
-              router.replace("/auth/sign-in");
-            } catch (error) {
-              Alert.alert("エラー", "サインアウトに失敗しました。");
-            }
-          },
-        },
-      ],
-      { cancelable: false }
-    );
-  };
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#007AFF",
+        tabBarActiveTintColor: "#FF6B6B", // アプリのメインカラーに変更
         tabBarLabelStyle: {
           fontSize: 12,
         },
-        headerRight: () => (
-          <Pressable
-            onPress={handleSignOut}
-            style={({ pressed }) => ({
-              marginRight: 16,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
-          </Pressable>
-        ),
+        headerShown: false,
       }}
     >
       <Tabs.Screen
@@ -69,7 +28,17 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <HapticTab icon="book-open" color={color} />
           ),
-          headerShown: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.push({
+              pathname: "/(tabs)/recipes",
+              params: {
+                refresh: Date.now().toString(),
+              },
+            });
+          },
         }}
       />
       <Tabs.Screen
@@ -79,7 +48,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <HapticTab icon="calendar" color={color} />
           ),
-          headerShown: false,
         }}
         listeners={{
           tabPress: (e) => {
@@ -91,6 +59,15 @@ export default function TabLayout() {
               },
             });
           },
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "設定",
+          tabBarIcon: ({ color }) => (
+            <HapticTab icon="settings" color={color} />
+          ),
         }}
       />
     </Tabs>

@@ -20,11 +20,29 @@ const COLORS = {
     secondary: "#64748B",
   },
   border: "#E2E8F0",
-  cardBg: {
-    blue: "#EBF3FF",
-    teal: "#E6FAF8",
-    orange: "#FFF3E6",
-    purple: "#F3F1FF",
+};
+
+// カテゴリーごとの色を定義
+const CATEGORY_COLORS = {
+  主菜: {
+    background: "#FEE2E2", // 薄い赤
+    border: "#FECACA",
+    text: "#991B1B",
+  },
+  副菜: {
+    background: "#DCFCE7", // 薄い緑
+    border: "#BBF7D0",
+    text: "#166534",
+  },
+  スープ: {
+    background: "#E0F2FE", // 薄い青
+    border: "#BAE6FD",
+    text: "#075985",
+  },
+  その他: {
+    background: "#F3F4F6", // グレー
+    border: "#E5E7EB",
+    text: "#374151",
   },
 };
 
@@ -47,8 +65,26 @@ export function RecipeCard({
 
   const CardComponent = onPress ? Pressable : View;
 
+  // カテゴリーに応じた色を取得
+  const categoryColor = CATEGORY_COLORS[
+    recipe.category as keyof typeof CATEGORY_COLORS
+  ] || {
+    background: COLORS.background,
+    border: COLORS.border,
+    text: COLORS.text.secondary,
+  };
+
   const renderContent = () => (
-    <View style={[styles.card, compact && styles.compactCard]}>
+    <View
+      style={[
+        styles.card,
+        compact && styles.compactCard,
+        {
+          backgroundColor: categoryColor.background,
+          borderColor: categoryColor.border,
+        },
+      ]}
+    >
       {!compact && recipe.image_url && (
         <Image source={{ uri: recipe.image_url }} style={styles.image} />
       )}
@@ -82,37 +118,58 @@ export function RecipeCard({
             )}
             <View style={styles.metaInfo}>
               {recipe.cooking_time > 0 && (
-                <View style={styles.metaItem}>
+                <View
+                  style={[
+                    styles.metaItem,
+                    { backgroundColor: categoryColor.border },
+                  ]}
+                >
                   <Ionicons
                     name="time-outline"
                     size={16}
-                    color={COLORS.text.secondary}
+                    color={categoryColor.text}
                   />
-                  <ThemedText style={styles.metaText}>
+                  <ThemedText
+                    style={[styles.metaText, { color: categoryColor.text }]}
+                  >
                     {recipe.cooking_time}分
                   </ThemedText>
                 </View>
               )}
               {recipe.servings > 0 && (
-                <View style={styles.metaItem}>
+                <View
+                  style={[
+                    styles.metaItem,
+                    { backgroundColor: categoryColor.border },
+                  ]}
+                >
                   <Ionicons
                     name="people-outline"
                     size={16}
-                    color={COLORS.text.secondary}
+                    color={categoryColor.text}
                   />
-                  <ThemedText style={styles.metaText}>
+                  <ThemedText
+                    style={[styles.metaText, { color: categoryColor.text }]}
+                  >
                     {recipe.servings}人分
                   </ThemedText>
                 </View>
               )}
               {recipe.category && (
-                <View style={styles.metaItem}>
+                <View
+                  style={[
+                    styles.metaItem,
+                    { backgroundColor: categoryColor.border },
+                  ]}
+                >
                   <Ionicons
                     name="restaurant-outline"
                     size={16}
-                    color={COLORS.text.secondary}
+                    color={categoryColor.text}
                   />
-                  <ThemedText style={styles.metaText}>
+                  <ThemedText
+                    style={[styles.metaText, { color: categoryColor.text }]}
+                  >
                     {recipe.category}
                   </ThemedText>
                 </View>
@@ -131,6 +188,10 @@ export function RecipeCard({
         style={({ pressed }) => [
           styles.card,
           compact && styles.compactCard,
+          {
+            backgroundColor: categoryColor.background,
+            borderColor: categoryColor.border,
+          },
           pressed && styles.cardPressed,
         ]}
       >
@@ -144,7 +205,6 @@ export function RecipeCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.card,
     borderRadius: 12,
     overflow: "hidden",
     shadowColor: "#000",
@@ -152,6 +212,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
   },
   compactCard: {
     flexDirection: "row",
@@ -159,9 +220,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 20,
     minHeight: 50,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: COLORS.card,
   },
   image: {
     width: "100%",
@@ -208,10 +266,10 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
+    borderRadius: 16,
   },
   metaText: {
     fontSize: 14,
-    color: COLORS.text.secondary,
     fontWeight: "500",
   },
   deleteButton: {
@@ -222,7 +280,11 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   cardPressed: {
-    backgroundColor: "#F8FAFC",
     transform: [{ scale: 0.995 }],
+  },
+  compactImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
   },
 });

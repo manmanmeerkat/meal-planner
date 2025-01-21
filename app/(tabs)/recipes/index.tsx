@@ -40,11 +40,18 @@ export default function RecipeList() {
   const { refresh } = useLocalSearchParams<{ refresh: string }>();
 
   useEffect(() => {
-    const loadData = async () => {
-      await fetchRecipes(true);
-    };
-    loadData();
+    fetchRecipes();
   }, [refresh]);
+
+  const getRecipeCountByCategory = (categoryId: string) => {
+    if (categoryId === "all") {
+      return recipes.length;
+    }
+    const categoryLabel = CATEGORIES.find(
+      (cat) => cat.id === categoryId
+    )?.label;
+    return recipes.filter((recipe) => recipe.category === categoryLabel).length;
+  };
 
   const filteredRecipes = recipes.filter((recipe) => {
     const matchesQuery =
@@ -55,7 +62,9 @@ export default function RecipeList() {
       );
 
     const matchesCategory =
-      selectedCategory === "all" || recipe.category === selectedCategory;
+      selectedCategory === "all" ||
+      recipe.category ===
+        CATEGORIES.find((cat) => cat.id === selectedCategory)?.label;
 
     let matchesTime = true;
     if (selectedTime !== "all") {
@@ -128,9 +137,23 @@ export default function RecipeList() {
               onChangeText={setSearchQuery}
               placeholder="レシピ・材料を検索"
               style={styles.searchInput}
-              clearButtonMode="while-editing"
               placeholderTextColor={COLORS.text.secondary}
             />
+            {searchQuery.length > 0 && (
+              <Pressable
+                onPress={() => setSearchQuery("")}
+                style={({ pressed }) => [
+                  styles.clearButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={COLORS.text.secondary}
+                />
+              </Pressable>
+            )}
           </View>
         </View>
       )}
@@ -161,6 +184,16 @@ export default function RecipeList() {
                   ]}
                 >
                   {category.label}
+                  <ThemedText
+                    style={[
+                      styles.countText,
+                      selectedCategory === category.id &&
+                        styles.countTextSelected,
+                    ]}
+                  >
+                    {" "}
+                    ({getRecipeCountByCategory(category.id)})
+                  </ThemedText>
                 </ThemedText>
               </Pressable>
             ))}
@@ -260,13 +293,13 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: "#3B82F6",
-    paddingTop: 32, // iOSのステータスバーの高さを考慮
+    paddingTop: 32,
   },
   headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16, // 上下左右均等なパディング
+    padding: 16,
   },
   title: {
     fontSize: 28,
@@ -300,8 +333,12 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     marginLeft: 8,
+    marginRight: 8,
     fontSize: 16,
     color: COLORS.text.primary,
+  },
+  clearButton: {
+    padding: 4,
   },
   filtersContainer: {
     backgroundColor: COLORS.card,
@@ -337,6 +374,13 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
   },
   filterChipTextSelected: {
+    color: "white",
+  },
+  countText: {
+    fontSize: 12,
+    color: COLORS.text.secondary,
+  },
+  countTextSelected: {
     color: "white",
   },
   content: {

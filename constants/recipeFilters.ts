@@ -4,7 +4,7 @@ export const CATEGORIES = [
     { id: 'main', label: '主菜' },
     { id: 'side', label: '副菜' },
     { id: 'soup', label: 'スープ' },
-    { id: 'dessert', label: 'デザート' },
+    { id: 'other', label: 'その他'  },
   ];
   
   export const COOKING_TIMES = [

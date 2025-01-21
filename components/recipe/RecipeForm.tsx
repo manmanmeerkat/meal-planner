@@ -43,11 +43,9 @@ const COLORS = {
   },
 };
 
-const DEFAULT_IMAGES = [
-  "https://via.placeholder.com/400x300/F5F7FA/718096?text=Recipe",
-  "https://via.placeholder.com/400x300/F5F7FA/718096?text=Food",
-  "https://via.placeholder.com/400x300/F5F7FA/718096?text=Cooking",
-];
+const DEFAULT_IMAGES = {
+  noImage: `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/recipe-images/default-recipe-image.png`,
+};
 
 export function RecipeForm({
   onSubmit,
@@ -65,7 +63,7 @@ export function RecipeForm({
   const [servings, setServings] = useState(
     initialData?.servings?.toString() ?? ""
   );
-  const [category, setCategory] = useState(initialData?.category ?? "main");
+  const [category, setCategory] = useState(initialData?.category ?? "");
   const [ingredients, setIngredients] = useState<Ingredient[]>(
     initialData?.ingredients ?? [{ name: "", amount: "" }]
   );
@@ -77,6 +75,7 @@ export function RecipeForm({
     title?: string;
     cookingTime?: string;
     servings?: string;
+    category?: string;
   }>({});
 
   const hasDetailedInfo = () => {
@@ -109,6 +108,7 @@ export function RecipeForm({
       setIsSimpleMode(newMode);
     }
   };
+
   const pickImage = async () => {
     try {
       const { status } =
@@ -128,7 +128,6 @@ export function RecipeForm({
 
       if (!result.canceled && result.assets[0]) {
         try {
-          // URIを文字列として直接渡す
           const url = await uploadRecipeImage(result.assets[0].uri);
           if (url) {
             setImageUrl(url);
@@ -195,6 +194,10 @@ export function RecipeForm({
       newErrors.title = "レシピ名を入力してください";
     }
 
+    if (!category.trim()) {
+      newErrors.category = "カテゴリーを選択してください";
+    }
+
     if (!isSimpleMode) {
       if (cookingTime && isNaN(Number(cookingTime))) {
         newErrors.cookingTime = "数値を入力してください";
@@ -212,15 +215,17 @@ export function RecipeForm({
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    const DEFAULT_IMAGE_URL =
-      DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)];
+    const getDefaultImageUrl = () => {
+      if (isSimpleMode) {
+        return DEFAULT_IMAGES.noImage;
+      }
+      return imageUrl || DEFAULT_IMAGES.noImage;
+    };
 
     const recipeData = {
       title,
       category,
-      image_url: isSimpleMode
-        ? DEFAULT_IMAGE_URL
-        : imageUrl || DEFAULT_IMAGE_URL,
+      image_url: getDefaultImageUrl(),
       calories: initialData?.calories ?? 0,
       ...(isSimpleMode
         ? {
@@ -241,13 +246,8 @@ export function RecipeForm({
 
     try {
       await onSubmit(recipeData);
-      // 保存成功後にレシピ一覧画面に遷移
-      router.push({
-        pathname: "/(tabs)/recipes",
-        params: { refresh: Date.now() }, // リフレッシュパラメータを追加して新しいレシピが表示されるようにする
-      });
     } catch (error) {
-      Alert.alert("エラー", "レシピの保存に失敗しました。");
+      throw error;
     }
   };
 
@@ -269,13 +269,21 @@ export function RecipeForm({
           <Input
             label="レシピ名"
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(value) => {
+              setTitle(value);
+              setErrors((prev) => ({ ...prev, title: undefined }));
+            }}
             error={errors.title}
             placeholder="例：肉じゃが"
           />
 
           <View style={styles.categorySection}>
             <ThemedText style={styles.label}>カテゴリー</ThemedText>
+            {errors.category && (
+              <ThemedText style={styles.errorText}>
+                {errors.category}
+              </ThemedText>
+            )}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -284,17 +292,20 @@ export function RecipeForm({
               {CATEGORIES.filter((c) => c.id !== "all").map((cat) => (
                 <Pressable
                   key={cat.id}
-                  onPress={() => setCategory(cat.id)}
+                  onPress={() => {
+                    setCategory(cat.label);
+                    setErrors((prev) => ({ ...prev, category: undefined }));
+                  }}
                   style={({ pressed }) => [
                     styles.categoryChip,
-                    category === cat.id && styles.categoryChipSelected,
+                    category === cat.label && styles.categoryChipSelected,
                     pressed && styles.pressed,
                   ]}
                 >
                   <ThemedText
                     style={[
                       styles.categoryChipText,
-                      category === cat.id && styles.categoryChipTextSelected,
+                      category === cat.label && styles.categoryChipTextSelected,
                     ]}
                   >
                     {cat.label}
@@ -346,28 +357,42 @@ export function RecipeForm({
                 placeholder="レシピの説明や特徴を入力してください"
               />
 
+              <ThemedText style={[styles.sectionTitle, styles.subSectionTitle]}>
+                調理情報
+              </ThemedText>
               <View style={styles.row}>
-                <Input
-                  label="調理時間"
-                  value={cookingTime}
-                  onChangeText={setCookingTime}
-                  keyboardType="numeric"
-                  error={errors.cookingTime}
-                  placeholder="分"
-                  suffix="分"
-                  style={styles.flex1}
-                />
+                <View style={styles.flex1}>
+                  <Input
+                    label="調理時間"
+                    value={cookingTime}
+                    onChangeText={(value) => {
+                      setCookingTime(value);
+                      setErrors((prev) => ({
+                        ...prev,
+                        cookingTime: undefined,
+                      }));
+                    }}
+                    keyboardType="numeric"
+                    error={errors.cookingTime}
+                    placeholder="分"
+                    suffix="分"
+                  />
+                </View>
                 <View style={styles.spacer} />
-                <Input
-                  label="何人分"
-                  value={servings}
-                  onChangeText={setServings}
-                  keyboardType="numeric"
-                  error={errors.servings}
-                  placeholder="人数"
-                  suffix="人分"
-                  style={styles.flex1}
-                />
+                <View style={styles.flex1}>
+                  <Input
+                    label="何人分"
+                    value={servings}
+                    onChangeText={(value) => {
+                      setServings(value);
+                      setErrors((prev) => ({ ...prev, servings: undefined }));
+                    }}
+                    keyboardType="numeric"
+                    error={errors.servings}
+                    placeholder="人数"
+                    suffix="人分"
+                  />
+                </View>
               </View>
             </View>
 
@@ -478,7 +503,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
   },
-
   modeSwitchText: {
     fontSize: 16,
     fontWeight: "500",
@@ -495,6 +519,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 16,
     color: COLORS.text.primary,
+  },
+  subSectionTitle: {
+    marginTop: 24,
+    marginBottom: 12,
   },
   label: {
     fontSize: 14,
@@ -594,5 +622,10 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  errorText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    marginBottom: 8,
   },
 });
